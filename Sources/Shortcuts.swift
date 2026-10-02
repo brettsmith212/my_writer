@@ -63,8 +63,8 @@ enum AppShortcut: CaseIterable {
         case .command:
             switch self {
             case .toggleTools: return ("e", [.command, .shift])
-            case .alternatives: return ("a", [.command, .shift])
-            case .aiAlternatives: return ("a", [.command, .option])
+            case .alternatives: return ("a", [.command, .option])
+            case .aiAlternatives: return ("i", [.command, .option])
             case .nextAlternative: return (.downArrow, [.command, .option])
             case .previousAlternative: return (.upArrow, [.command, .option])
             case .ghost: return ("g", [.command, .option])

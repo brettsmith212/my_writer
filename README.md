@@ -46,8 +46,8 @@ Standard Mac shortcuts (⌘S, ⌘Z, ⌘C, ⌘,) work as usual. Use Caps Lock as 
 | Action | Keys | ⌃⇧ style |
 | --- | --- | --- |
 | Show / hide writing tools | ⇧⌘E, or click the word count | ⌃⇧E |
-| Alternatives for a selection (or open/close the panel) | ⇧⌘A, or right-click | ⌃⇧A |
-| AI alternatives | ⌥⌘A | ⌃⇧I |
+| Alternatives for a selection (or open/close the panel) | ⌥⌘A, or right-click | ⌃⇧A |
+| AI alternatives | ⌥⌘I | ⌃⇧I |
 | Next / previous alternative | Hover the underline + → / ←, or ⌥⌘↓ / ⌥⌘↑ | ⌃⇧J / ⌃⇧K |
 | In the alternatives panel | Return adds · `??` asks AI · click applies · ↑ ↓ cycle · Delete removes | |
 | Ghost / revive | ⌥⌘G | ⌃⇧G |

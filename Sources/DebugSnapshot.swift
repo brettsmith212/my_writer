@@ -166,10 +166,10 @@ enum DebugSnapshot {
                         session.tourStep = n
                     }
                 }
-            case "cmdkey":
-                // cmdkey <char>: send ⌘<char> through the main menu, like a real key equivalent.
+            case "cmdkey", "optcmdkey":
+                // cmdkey <char> / optcmdkey <char>: send ⌘<char> or ⌥⌘<char> through the main menu.
                 if let tv = session.textView, let char = parts[safe: 1],
-                   let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command],
+                   let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: parts[0] == "optcmdkey" ? [.command, .option] : [.command],
                                                 timestamp: ProcessInfo.processInfo.systemUptime,
                                                 windowNumber: tv.window?.windowNumber ?? 0, context: nil,
                                                 characters: char, charactersIgnoringModifiers: char,

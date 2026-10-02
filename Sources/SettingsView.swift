@@ -73,7 +73,7 @@ struct SettingsView: View {
                 .pointingHandOnHover()
                 caption(shortcutStyle == AppShortcut.Style.control.rawValue
                     ? "MyWriter's shortcuts use Control + Shift + a letter (⌃⇧A alternatives, ⌃⇧G ghost…), leaving plain Control keys for Vim and text editing. Standard Mac shortcuts like ⌘S stay the same."
-                    : "MyWriter's shortcuts use Command, Mac style (⇧⌘A alternatives, ⌥⌘G ghost…).")
+                    : "MyWriter's shortcuts use Option + Command (⌥⌘A alternatives, ⌥⌘L lab, ⌥⌘G ghost…).")
                 }
                 Section("Vim") {
                 Toggle("Vim mode", isOn: $vimEnabled)
