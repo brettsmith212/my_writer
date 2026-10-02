@@ -13,13 +13,15 @@ final class Updates: NSObject, ObservableObject, SPUStandardUserDriverDelegate, 
     /// The version waiting to be installed, when there is one.
     @Published private(set) var available: String?
 
-    private(set) lazy var controller = SPUStandardUpdaterController(
-        startingUpdater: true, updaterDelegate: self, userDriverDelegate: self
-    )
+    /// Sparkle's standard windows, behind a driver that smooths the timing
+    /// of "Checking for updates…" (see SmoothUserDriver).
+    private lazy var driver = SmoothUserDriver(inner: SPUStandardUserDriver(hostBundle: .main, delegate: self))
 
-    var updater: SPUUpdater { controller.updater }
+    private(set) lazy var updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: self)
 
-    func start() { _ = controller }
+    func start() {
+        do { try updater.start() } catch { NSLog("MyWriter updates couldn't start: %@", String(describing: error)) }
+    }
 
     func checkForUpdates() { updater.checkForUpdates() }
 
@@ -110,5 +112,143 @@ struct UpdatesSection: View {
                 Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
             }
         }
+    }
+}
+
+/// Sparkle's standard update windows with calmer timing for a manual check:
+/// - "Checking for updates…" only appears if the check takes longer than
+///   half a second, so a quick answer goes straight to the result.
+/// - Once it has appeared, it stays at least a second, so it never blinks.
+/// Everything else passes straight through to Sparkle.
+@MainActor
+final class SmoothUserDriver: NSObject, SPUUserDriver {
+    private let inner: SPUStandardUserDriver
+    private static let delay: TimeInterval = 0.5
+    private static let minimumVisible: TimeInterval = 1.0
+
+    private var pendingCheckWindow: DispatchWorkItem?
+    private var checkWindowShownAt: Date?
+    private var held: [() -> Void] = []
+    private var flushScheduled = false
+
+    init(inner: SPUStandardUserDriver) { self.inner = inner }
+
+    private func trace(_ what: String) {
+        #if DEBUG
+        // MYWRITER_UPDATE_TRACE=<file>: append timestamped steps, for timing tests.
+        if let path = ProcessInfo.processInfo.environment["MYWRITER_UPDATE_TRACE"] {
+            let line = String(format: "%.3f %@\n", Date().timeIntervalSince1970, what)
+            if let h = FileHandle(forWritingAtPath: path) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+        }
+        #endif
+    }
+
+    func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
+        trace("check started")
+        checkWindowShownAt = nil
+        let show = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingCheckWindow = nil
+            self.checkWindowShownAt = Date()
+            self.trace("checking window shown")
+            self.inner.showUserInitiatedUpdateCheck(cancellation: cancellation)
+        }
+        pendingCheckWindow = show
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.delay, execute: show)
+    }
+
+    /// Runs the next step now, or after the checking window's minimum time.
+    private func pass(_ step: @escaping () -> Void) {
+        trace("result arrived")
+        if let pending = pendingCheckWindow {
+            // Answered before the checking window appeared: skip it entirely.
+            pending.cancel()
+            pendingCheckWindow = nil
+            step()
+            return
+        }
+        guard let shownAt = checkWindowShownAt else {
+            if held.isEmpty { step() } else { held.append(step) }
+            return
+        }
+        held.append(step)
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        let remaining = max(0, Self.minimumVisible - Date().timeIntervalSince(shownAt))
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { [weak self] in
+            guard let self else { return }
+            self.flushScheduled = false
+            self.checkWindowShownAt = nil
+            let steps = self.held
+            self.held = []
+            self.trace("result shown after minimum time")
+            steps.forEach { $0() }
+        }
+    }
+
+    // MARK: Pass-through
+
+    func show(_ request: SPUUpdatePermissionRequest, reply: @escaping (SUUpdatePermissionResponse) -> Void) {
+        inner.show(request, reply: reply)
+    }
+
+    func showUpdateFound(with appcastItem: SUAppcastItem, state: SPUUserUpdateState, reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        pass { self.inner.showUpdateFound(with: appcastItem, state: state, reply: reply) }
+    }
+
+    func showUpdateReleaseNotes(with downloadData: SPUDownloadData) {
+        pass { self.inner.showUpdateReleaseNotes(with: downloadData) }
+    }
+
+    func showUpdateReleaseNotesFailedToDownloadWithError(_ error: Error) {
+        pass { self.inner.showUpdateReleaseNotesFailedToDownloadWithError(error) }
+    }
+
+    func showUpdateNotFoundWithError(_ error: Error, acknowledgement: @escaping () -> Void) {
+        pass { self.inner.showUpdateNotFoundWithError(error, acknowledgement: acknowledgement) }
+    }
+
+    func showUpdaterError(_ error: Error, acknowledgement: @escaping () -> Void) {
+        pass { self.inner.showUpdaterError(error, acknowledgement: acknowledgement) }
+    }
+
+    func showDownloadInitiated(cancellation: @escaping () -> Void) {
+        pass { self.inner.showDownloadInitiated(cancellation: cancellation) }
+    }
+
+    func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {
+        pass { self.inner.showDownloadDidReceiveExpectedContentLength(expectedContentLength) }
+    }
+
+    func showDownloadDidReceiveData(ofLength length: UInt64) {
+        pass { self.inner.showDownloadDidReceiveData(ofLength: length) }
+    }
+
+    func showDownloadDidStartExtractingUpdate() {
+        pass { self.inner.showDownloadDidStartExtractingUpdate() }
+    }
+
+    func showExtractionReceivedProgress(_ progress: Double) {
+        pass { self.inner.showExtractionReceivedProgress(progress) }
+    }
+
+    func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        pass { self.inner.showReady(toInstallAndRelaunch: reply) }
+    }
+
+    func showInstallingUpdate(withApplicationTerminated applicationTerminated: Bool, retryTerminatingApplication: @escaping () -> Void) {
+        pass { self.inner.showInstallingUpdate(withApplicationTerminated: applicationTerminated, retryTerminatingApplication: retryTerminatingApplication) }
+    }
+
+    func showUpdateInstalledAndRelaunched(_ relaunched: Bool, acknowledgement: @escaping () -> Void) {
+        pass { self.inner.showUpdateInstalledAndRelaunched(relaunched, acknowledgement: acknowledgement) }
+    }
+
+    func showUpdateInFocus() {
+        pass { self.inner.showUpdateInFocus() }
+    }
+
+    func dismissUpdateInstallation() {
+        pass { self.inner.dismissUpdateInstallation() }
     }
 }
