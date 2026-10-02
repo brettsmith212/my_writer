@@ -355,22 +355,50 @@ private struct ToolButton: View {
 
 /// An instant label above a control while the pointer is over it, with a
 /// small arrow pointing at the control. Labels sit centered above their
-/// control; `extendsLeft` grows one leftward instead, for the control at the
-/// window's right edge.
+/// control and slide inward just enough to stay inside the window; the arrow
+/// keeps pointing at the control. `extendsLeft` grows one leftward instead.
 private struct HoverLabel: ViewModifier {
     let text: String
     let extendsLeft: Bool
     @State private var hovering = false
+    @State private var controlFrame: CGRect = .zero
+    @State private var labelWidth: CGFloat = 0
+
+    /// Debug builds: MYWRITER_SHOW_HOVER_LABELS shows every label, for layout checks.
+    private static var debugShowAll: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["MYWRITER_SHOW_HOVER_LABELS"] != nil
+        #else
+        false
+        #endif
+    }
+
+    /// How far to slide the capsule so it fits inside the window (8pt margin).
+    private var shift: CGFloat {
+        guard !extendsLeft, labelWidth > 0,
+              let windowWidth = NSApp.keyWindow?.contentLayoutRect.width else { return 0 }
+        let center = controlFrame.midX
+        let overRight = center + labelWidth / 2 - (windowWidth - 8)
+        let overLeft = 8 - (center - labelWidth / 2)
+        if overRight > 0 { return -overRight }
+        if overLeft > 0 { return overLeft }
+        return 0
+    }
 
     func body(content: Content) -> some View {
         content
             .background(Circle().fill(hovering ? Color.ink.opacity(0.06) : .clear))
+            .background(GeometryReader { geo in
+                Color.clear
+                    .onAppear { controlFrame = geo.frame(in: .global) }
+                    .onChange(of: geo.frame(in: .global)) { _, frame in controlFrame = frame }
+            })
             .onHover { inside in
                 withAnimation(.easeOut(duration: 0.12)) { hovering = inside }
             }
             .pointingHandOnHover()
             .overlay(alignment: extendsLeft ? .topTrailing : .top) {
-                if hovering {
+                if hovering || Self.debugShowAll {
                     VStack(alignment: extendsLeft ? .trailing : .center, spacing: 0) {
                         Text(text)
                             .font(.system(size: 11, weight: .medium))
@@ -380,6 +408,12 @@ private struct HoverLabel: ViewModifier {
                             .padding(.vertical, 5)
                             .background(Capsule().fill(Color.panel))
                             .overlay(Capsule().strokeBorder(Color.hairline))
+                            .background(GeometryReader { geo in
+                                Color.clear
+                                    .onAppear { labelWidth = geo.size.width }
+                                    .onChange(of: geo.size.width) { _, width in labelWidth = width }
+                            })
+                            .offset(x: shift)
                         Arrow()
                             .fill(Color.panel)
                             .overlay(Arrow().stroke(Color.hairline, lineWidth: 1))
