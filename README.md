@@ -2,18 +2,14 @@
 
 A quiet Markdown writing app for macOS. A plain page by default; writing tools appear when you want them.
 
+Inspired by Jason Fried's demos of his own writing app. Not affiliated with Jason Fried or 37signals.
+
 ## Install
 
-Requires macOS 14+, Xcode, and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+1. Download the `.dmg` from the [latest release](https://github.com/brettsmith212/my_writer/releases/latest).
+2. Open it and drag **MyWriter** to Applications.
 
-```bash
-make install    # release build → /Applications/MyWriter.app
-make run        # or: build and launch a debug build
-```
-
-Or download the signed, notarized `.dmg` from [Releases](../../releases).
-
-**Shipping a version** (maintainers): `make release V=0.1.1` sets the version, builds a Developer ID signed and notarized `.dmg`, publishes a GitHub Release, and installs that copy into /Applications. It needs the Developer ID certificate and saved notarization credentials (see the comments above `dmg` in the Makefile).
+Requires macOS 14 or later. Signed and notarized by Apple, and it keeps itself up to date.
 
 Optional: **MyWriter → Install Shell Command…** adds a `mywriter` command for opening files from a terminal:
 
@@ -91,5 +87,32 @@ MyWriter checks for updates about once a day. When one is ready, a small **Updat
 ## Files
 
 - **Documents** are plain `.md` files, saved wherever you choose. New documents show **Not saved** (top bar) until you give them a name with ⌘S. Move the pointer to the top edge to see the file's name; click it for its folder, Show in Finder, Copy Path and Rename.
-- **Alternatives and ghosts** are inline `<span>` tags, so other Markdown apps show your current wording. The alternatives list and overflow sit in an HTML comment at the end of the file.
+- **Alternatives and ghosts** are inline `<span>` tags, so other Markdown apps show your current wording. The alternatives list and overflow sit in an HTML comment at the end of the file. Reading a MyWriter file elsewhere is fine; editing it in another app can lose its alternatives, so do that in MyWriter (or export a clean copy first).
 - **Settings and Lab tools** live in `~/Library/Preferences/com.brettsmith.MyWriter.plist`.
+
+## Privacy
+
+MyWriter has no account, analytics or tracking.
+
+- **AI features** send text to the provider you chose (OpenAI or Anthropic): the selected passage for alternatives, the whole document for the Lab. Nothing is sent until you use an AI feature.
+- **Keys and sign-in tokens** stay in your macOS Keychain. Documents stay where you save them.
+- **Update checks** fetch a small file from GitHub about once a day, which shares only the app and macOS version. You can turn this off in Settings → Editor → Updates.
+
+## Feedback
+
+Found a bug or have an idea? [Open an issue](https://github.com/brettsmith212/my_writer/issues/new), or use **Help → Send Feedback…** in the app.
+
+## Development
+
+Building from source needs Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`):
+
+```bash
+make run        # build and launch a debug build
+make install    # release build → /Applications/MyWriter.app
+```
+
+**Shipping a version** (maintainer): `make release V=0.2.1` sets the version, builds a Developer ID signed and notarized `.dmg`, publishes a GitHub Release, adds it to the update feed (`appcast.xml`), and installs that copy. It needs the Developer ID certificate, saved notarization credentials (see the comments above `dmg` in the Makefile), and the Sparkle update key in the Keychain.
+
+## License
+
+[MIT](LICENSE)

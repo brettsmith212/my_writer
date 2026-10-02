@@ -80,6 +80,10 @@ struct WriterCommands: Commands {
             item("Keyboard Shortcuts", .shortcutsCard)
             Divider()
             Button("Open Practice Document") { PracticeDocument.open() }
+            Divider()
+            Button("Send Feedback…") {
+                NSWorkspace.shared.open(URL(string: "https://github.com/brettsmith212/my_writer/issues/new")!)
+            }
         }
 
         CommandMenu("Write") {
