@@ -383,6 +383,9 @@ final class ChatGPTAuth: ObservableObject {
         onText: ((String) -> Void)? = nil
     ) async throws -> String {
         await loadIfNeeded()
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["MYWRITER_FAKE_DISCONNECTED"] != nil { throw AIError.notSetUp }
+        #endif
         guard isConnected else { throw AIError.notSetUp }
         if currentModel == nil {
             await loadModels()

@@ -235,7 +235,7 @@ enum DebugSnapshot {
                 }
             case "state":
                 // state <path> <label>: append tools/panel/vim state and text length.
-                let line = "\(parts[safe: 2] ?? ""): tools=\(session.featuresOn) alts=\(session.showAlternatives) right=\(session.rightPanel?.rawValue ?? "none") preview=\(session.previewing) zen=\(session.zen != nil) full=\(session.textView?.window?.styleMask.contains(.fullScreen) == true) vim=\(session.vimStatus ?? "off") len=\(session.storage.length)\n"
+                let line = "\(parts[safe: 2] ?? ""): tools=\(session.featuresOn) alts=\(session.showAlternatives) right=\(session.rightPanel?.rawValue ?? "none") preview=\(session.previewing) setup=\(session.showAISetup) error=\(session.errorMessage ?? "-") busy=\(session.busy ?? "-") zen=\(session.zen != nil) full=\(session.textView?.window?.styleMask.contains(.fullScreen) == true) vim=\(session.vimStatus ?? "off") len=\(session.storage.length)\n"
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
                 else { try? line.write(toFile: parts[1], atomically: true, encoding: .utf8) }
             case "modelsraw":
