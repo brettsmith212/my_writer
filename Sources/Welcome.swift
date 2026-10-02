@@ -40,6 +40,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         class_replaceMethod(cls, #selector(NSApplicationDelegate.applicationShouldHandleReopen(_:hasVisibleWindows:)),
                             imp_implementationWithBlock(reopen), "B@:@B")
+
+        // The + in Show All Tabs asks for a new tab; if the page didn't take
+        // the request, answer it here too, so it's a tab, not a window.
+        let newTab: @convention(block) (AnyObject, AnyObject?) -> Void = { _, _ in
+            MainActor.assumeIsolated { WindowTabs.newTab() }
+        }
+        class_replaceMethod(cls, #selector(NSResponder.newWindowForTab(_:)),
+                            imp_implementationWithBlock(newTab), "v@:@")
     }
 }
 

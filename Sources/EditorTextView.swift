@@ -162,6 +162,13 @@ final class EditorTextView: NSTextView {
         scheduleCaretUpdate()
     }
 
+    // MARK: Tabs
+
+    /// The + in Show All Tabs (and the tab bar) asks for a new tab this way.
+    override func newWindowForTab(_ sender: Any?) {
+        WindowTabs.newTab()
+    }
+
     // MARK: Pinch for all tabs
 
     /// A two-finger pinch-in on the page shows all tabs, like Safari.

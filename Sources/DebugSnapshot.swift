@@ -183,6 +183,9 @@ enum DebugSnapshot {
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
             case "newtab": WindowTabs.newTab()
+            case "overviewplus":
+                // What the + in Show All Tabs sends.
+                NSApp.sendAction(#selector(NSResponder.newWindowForTab(_:)), to: nil, from: nil)
             case "tabstate":
                 // tabstate <path> <label>: the tab group's bar state for each document window.
                 var line = "\(parts[safe: 2] ?? ""):"
