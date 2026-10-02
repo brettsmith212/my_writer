@@ -182,6 +182,18 @@ enum DebugSnapshot {
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
+            case "topchar":
+                // topchar <path> <label>: append the character at the top of the page and the scroll offset.
+                if let tv = session.textView {
+                    let line = "\(parts[safe: 2] ?? ""): top=\(tv.debugTopCharacter()) y=\(Int(tv.visibleRect.minY)) view=\(UInt(bitPattern: ObjectIdentifier(tv).hashValue) % 100000) caret=\(tv.selectedRange().location)\n"
+                    if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+                }
+            case "scrollto":
+                // scrollto <character>: put that character's line at the top of the page.
+                if let tv = session.textView, let lm = tv.layoutManager, let loc = Int(parts[safe: 1] ?? "") {
+                    let rect = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: loc), effectiveRange: nil)
+                    tv.scroll(NSPoint(x: 0, y: rect.minY + tv.textContainerOrigin.y))
+                }
             case "bgcheck": Updates.shared.updater.checkForUpdatesInBackground()
             case "checkupdates": Updates.shared.checkForUpdates()
             case "closeall":

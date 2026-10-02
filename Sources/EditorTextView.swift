@@ -35,12 +35,84 @@ final class EditorTextView: NSTextView {
     // MARK: Layout
 
     override func setFrameSize(_ newSize: NSSize) {
+        // A width change (a panel opening or closing, a window resize)
+        // re-wraps every line; keep the same text at the top of the page.
+        let widthChanged = abs(newSize.width - frame.width) > 0.5
+        if widthChanged { beginKeepingReadingPosition() }
         super.setFrameSize(newSize)
         let side = max(40, floor((newSize.width - Theme.column) / 2))
         if abs(textContainerInset.width - side) > 0.5 {
             textContainerInset = NSSize(width: side, height: Theme.topInset)
         }
+        if widthChanged { restoreReadingPosition() }
         scheduleCaretUpdate()
+    }
+
+    // MARK: Reading position
+
+    /// The line at the top of the page (as a character) and how far into it
+    /// the page is scrolled. Updated as you scroll or type; held still while
+    /// the width is changing.
+    private var readingAnchor: (index: Int, offset: CGFloat)?
+    private var keepingPosition = false
+    /// True while MyWriter itself scrolls back, so that scroll doesn't move the anchor.
+    private var restoringPosition = false
+    private var keepingEnd: DispatchWorkItem?
+
+    func trackReadingPosition() {
+        guard let clip = enclosingScrollView?.contentView else { return }
+        clip.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.noteReadingPosition() }
+        }
+    }
+
+    private func noteReadingPosition() {
+        guard !keepingPosition, !restoringPosition, let lm = layoutManager, let tc = textContainer, !string.isEmpty else { return }
+        // Mid-resize (the scroll view already has its new width but the page
+        // doesn't yet), scrolling is the layout settling, not you.
+        if let clip = enclosingScrollView?.contentView, abs(clip.bounds.width - frame.width) > 1 { return }
+        let top = visibleRect.minY
+        let point = NSPoint(x: 1, y: max(0, top - textContainerOrigin.y))
+        let glyph = lm.glyphIndex(for: point, in: tc)
+        var lineGlyphs = NSRange()
+        let line = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &lineGlyphs)
+        let lineChars = lm.characterRange(forGlyphRange: lineGlyphs, actualGlyphRange: nil)
+        let offset = top - (line.minY + textContainerOrigin.y)
+        // Re-wrapping moves line starts around; while the anchor's character
+        // is still on the top line, keep it exactly so it can't creep.
+        if let anchor = readingAnchor, NSLocationInRange(anchor.index, lineChars) {
+            readingAnchor = (anchor.index, offset)
+        } else {
+            readingAnchor = (lm.characterIndexForGlyph(at: glyph), offset)
+        }
+    }
+
+    private func beginKeepingReadingPosition() {
+        if !keepingPosition { noteReadingPosition() }
+        keepingPosition = true
+        // Panels animate their width for a moment; settle once it stops.
+        keepingEnd?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.restoreReadingPosition()
+            self?.keepingPosition = false
+        }
+        keepingEnd = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func restoreReadingPosition() {
+        guard let anchor = readingAnchor, let lm = layoutManager, let tc = textContainer,
+              let clip = enclosingScrollView?.contentView, !string.isEmpty else { return }
+        lm.ensureLayout(for: tc)
+        let index = min(anchor.index, (string as NSString).length - 1)
+        let line = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: index), effectiveRange: nil)
+        let maxY = max(0, frame.height - clip.bounds.height)
+        let y = min(max(0, line.minY + textContainerOrigin.y + anchor.offset), maxY)
+        restoringPosition = true
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: y))
+        enclosingScrollView?.reflectScrolledClipView(clip)
+        restoringPosition = false
     }
 
     // MARK: Caret
@@ -93,6 +165,7 @@ final class EditorTextView: NSTextView {
     override func didChangeText() {
         super.didChangeText()
         scheduleCaretUpdate()
+        noteReadingPosition()
     }
 
     override func becomeFirstResponder() -> Bool {
@@ -321,6 +394,13 @@ final class EditorTextView: NSTextView {
 
     #if DEBUG
     /// Caret frame and its line fragment, for checking geometry from scripts.
+    /// The first character at the top of the visible page, for scroll tests.
+    func debugTopCharacter() -> Int {
+        guard let lm = layoutManager, let tc = textContainer else { return -1 }
+        let point = NSPoint(x: 10, y: visibleRect.minY - textContainerOrigin.y + 2)
+        return lm.characterIndexForGlyph(at: lm.glyphIndex(for: point, in: tc))
+    }
+
     func debugCaretGeometry(at loc: Int) -> String {
         guard let frame = caretFrame(at: loc), let lm = layoutManager, let ts = textStorage, loc < ts.length else { return "n/a" }
         let glyph = lm.glyphIndexForCharacter(at: loc)

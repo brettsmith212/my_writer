@@ -25,7 +25,7 @@ struct ContentView: View {
             if session.featuresOn && session.showAlternatives {
                 AlternativesPanel(session: session)
                     .frame(width: 272)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.opacity)
                 Rectangle().fill(Color.hairline).frame(width: 1)
             }
 
@@ -61,6 +61,9 @@ struct ContentView: View {
             .overlay(alignment: .top) { zoomHint }
             .overlay(alignment: .bottomTrailing) { if session.featuresOn { toolBar } }
             .overlay(alignment: .bottom) { errorToast }
+            // The page changes width in one step when a panel opens or closes,
+            // so the text re-wraps once (no flicker) and keeps its place.
+            .transaction { $0.animation = nil }
             .onContinuousHover { phase in
                 // Reveal the file name while the pointer is in the top strip. Applied
                 // after the overlays so being over the name itself still counts.
@@ -78,7 +81,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(width: 300)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
         .background(Color.paper)

@@ -44,6 +44,7 @@ struct EditorView: NSViewRepresentable {
         scroll.autohidesScrollers = true
         scroll.scrollerStyle = .overlay
         scroll.documentView = tv
+        tv.trackReadingPosition()
 
         session.attach(tv)
         DispatchQueue.main.async {
