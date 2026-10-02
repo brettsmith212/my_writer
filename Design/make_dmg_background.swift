@@ -1,5 +1,5 @@
-// Renders the background for MyWriter's disk image: warm paper, a soft arrow
-// from the app to Applications, and a one-line hint.
+// Renders the background for MyWriter's disk image: warm paper and a soft
+// arrow from the app to Applications.
 // Usage: swift Design/make_dmg_background.swift <folder>, then combine:
 //   tiffutil -cathidpicheck <folder>/dmg-background.png <folder>/dmg-background@2x.png -out Design/dmg-background.tiff
 // The icon positions here must match Tools/dmg_settings.py.
@@ -12,12 +12,6 @@ let folder = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "."
 
 func color(_ hex: UInt32, _ a: CGFloat = 1) -> NSColor {
     NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: a)
-}
-
-func serif(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
-    let base = NSFont.systemFont(ofSize: size, weight: weight)
-    if let d = base.fontDescriptor.withDesign(.serif), let f = NSFont(descriptor: d, size: size) { return f }
-    return base
 }
 
 func render(scale: CGFloat, to path: String) {
@@ -51,14 +45,6 @@ func render(scale: CGFloat, to path: String) {
     head.lineCapStyle = .round
     head.lineJoinStyle = .round
     head.stroke()
-
-    // The hint.
-    let style = NSMutableParagraphStyle()
-    style.alignment = .center
-    let hint = NSAttributedString(string: "Drag MyWriter to Applications to install", attributes: [
-        .font: serif(15, .regular), .foregroundColor: color(0x6E685E), .paragraphStyle: style,
-    ])
-    hint.draw(in: NSRect(x: 0, y: flipY(330), width: width, height: 22))
 
     NSGraphicsContext.restoreGraphicsState()
     try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
