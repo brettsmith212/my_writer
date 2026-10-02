@@ -183,6 +183,9 @@ enum DebugSnapshot {
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
             case "newtab": WindowTabs.newTab()
+            case "overview":
+                if let w = session.textView?.window { w.tabGroup?.isOverviewVisible = true }
+            case "newdocplain": NSDocumentController.shared.newDocument(nil)
             case "overviewplus":
                 // What the + in Show All Tabs sends.
                 NSApp.sendAction(#selector(NSResponder.newWindowForTab(_:)), to: nil, from: nil)

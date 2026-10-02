@@ -78,6 +78,19 @@ final class TabsModel: ObservableObject {
                 MainActor.assumeIsolated { TabsModel.shared.refresh() }
             }
         }
+        // A new document window that appears while a tab overview is open came
+        // from the overview's +: make it a tab of that window, not a new window.
+        center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { note in
+            MainActor.assumeIsolated {
+                guard let window = note.object as? NSWindow, window.windowController?.document != nil,
+                      (window.tabGroup?.windows.count ?? 1) <= 1,
+                      let host = NSApp.windows.first(where: { $0 !== window && $0.tabGroup?.isOverviewVisible == true })
+                else { return }
+                host.addTabbedWindow(window, ordered: .above)
+                window.makeKeyAndOrderFront(nil)
+                TabsModel.shared.refresh()
+            }
+        }
         // A closing window is still listed until the close finishes.
         center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { TabsModel.shared.refresh() } }

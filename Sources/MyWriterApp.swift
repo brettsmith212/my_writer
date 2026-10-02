@@ -62,16 +62,6 @@ struct WriterCommands: Commands {
                 .keyboardShortcut("t", modifiers: .command)
         }
 
-        CommandGroup(before: .windowList) {
-            Button("Show All Tabs") { WindowTabs.showAllTabs() }
-                .keyboardShortcut("\\", modifiers: [.command, .shift])
-            Button("Show Next Tab") { WindowTabs.selectNextTab(true) }
-                .keyboardShortcut(.tab, modifiers: .control)
-            Button("Show Previous Tab") { WindowTabs.selectNextTab(false) }
-                .keyboardShortcut(.tab, modifiers: [.control, .shift])
-            Divider()
-        }
-
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") { Updates.shared.checkForUpdates() }
         }
