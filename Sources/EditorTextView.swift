@@ -162,6 +162,27 @@ final class EditorTextView: NSTextView {
         scheduleCaretUpdate()
     }
 
+    // MARK: Pinch for all tabs
+
+    /// A two-finger pinch-in on the page shows all tabs, like Safari.
+    private var pinch: CGFloat = 0
+
+    override func magnify(with event: NSEvent) {
+        switch event.phase {
+        case .began:
+            pinch = 0
+        case .changed:
+            pinch += event.magnification
+        case .ended, .cancelled:
+            if pinch < -0.25, let window {
+                if let group = window.tabGroup { group.isOverviewVisible = true } else { window.toggleTabOverview(nil) }
+            }
+            pinch = 0
+        default:
+            break
+        }
+    }
+
     override func didChangeText() {
         super.didChangeText()
         scheduleCaretUpdate()

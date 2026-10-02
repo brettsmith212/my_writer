@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Set in the app's own domain so they win over the global settings.
         defaults.set(true, forKey: "NSQuitAlwaysKeepsWindows")
         defaults.set(false, forKey: "NSShowAppCentricOpenPanelInsteadOfUntitledFile")
+        // MyWriter manages tabs itself (⌘T, its own tab strip); keep the
+        // system's automatic tabbing and its duplicate menu items out of the way.
+        NSWindow.allowsAutomaticWindowTabbing = false
         Self.routeEmptyLaunchesToWelcome()
     }
 

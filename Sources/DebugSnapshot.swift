@@ -182,6 +182,15 @@ enum DebugSnapshot {
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
+            case "newtab": WindowTabs.newTab()
+            case "tabstate":
+                // tabstate <path> <label>: the tab group's bar state for each document window.
+                var line = "\(parts[safe: 2] ?? ""):"
+                for w in NSApp.windows where w.windowController?.document != nil {
+                    line += " ['\(w.title)' tabs=\(w.tabGroup?.windows.count ?? 0) barVisible=\(w.tabGroup?.isTabBarVisible ?? false) layoutH=\(Int(w.contentLayoutRect.height)) contentH=\(Int(w.contentView?.bounds.height ?? 0))]"
+                }
+                if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data((line + "\n").utf8)); try? h.close() }
+            case "togglebar": (NSApp.keyWindow ?? NSApp.mainWindow)?.toggleTabBar(nil)
             case "parseopenai":
                 // parseopenai <in.json> <out>: run the model filter on a saved /v1/models response.
                 if let data = FileManager.default.contents(atPath: parts[1]),

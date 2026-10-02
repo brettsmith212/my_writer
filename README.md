@@ -56,6 +56,9 @@ Standard Mac shortcuts (⌘S, ⌘Z, ⌘C, ⌘,) work as usual. Use Caps Lock as 
 | Preview | ⌥⌘P | ⌃⇧P |
 | Zen mode (full screen) | ⌃⌘Z | ⌃⇧Z |
 | Zoom in / out / actual size | ⌘+ / ⌘− / ⌘0 (resets each launch) | |
+| New tab / close tab | ⌘T / ⌘W | |
+| Show all tabs | ⇧⌘\\ or pinch in on the page | |
+| Next / previous tab | ⌃Tab / ⌃⇧Tab | |
 | Export clean copy | ⌥⇧⌘E | |
 | Copy clean text | ⇧⌘C | ⌃⇧C |
 | All shortcuts | ⌘/ | ⌘/ |

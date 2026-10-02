@@ -10,6 +10,7 @@ struct ContentView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var showZenHint = false
     @State private var showFileTitle = false
+    @ObservedObject private var tabs = TabsModel.shared
     @ObservedObject private var zoom = Zoom.shared
     @State private var showZoomHint = false
     @State private var zoomHintToken = 0
@@ -53,8 +54,10 @@ struct ContentView: View {
                 .opacity(session.previewing ? 0 : 1)
             }
             .overlay(alignment: .top) {
+                if !hasTabs {
                 FileTitle(fileURL: fileURL, window: { session.textView?.window }, export: { session.exportCleanCopy() }, visible: $showFileTitle)
                     .padding(.top, 8)
+                }
             }
             .overlay(alignment: .top) { topBar }
             .overlay(alignment: .top) { zenHint }
@@ -192,8 +195,16 @@ struct ContentView: View {
         }
     }
 
+    /// True when this window shows MyWriter's tab strip (two or more tabs).
+    private var hasTabs: Bool {
+        _ = tabs.tick
+        return (session.textView?.window?.tabGroup?.windows.count ?? 0) > 1
+    }
+
     private var topBar: some View {
         HStack(spacing: 12) {
+            TabStrip(window: { session.textView?.window }, export: { session.exportCleanCopy() })
+                .padding(.leading, 66)  // clear of the window buttons
             Spacer()
             if let busy = session.busy {
                 HStack(spacing: 6) {
