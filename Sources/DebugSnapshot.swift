@@ -352,6 +352,7 @@ enum DebugSnapshot {
                 }
                 line += " windows=\(NSApp.windows.filter(\.isVisible).map(\.title))\n"
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+            case "appfront": NSApp.activate(ignoringOtherApps: true)
             case "front":
                 NSApp.activate(ignoringOtherApps: true)
                 session.textView?.window?.makeKeyAndOrderFront(nil)

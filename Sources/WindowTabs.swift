@@ -11,7 +11,9 @@ enum WindowTabs {
     #endif
 
     static func newTab() {
-        guard let front = NSApp.keyWindow ?? NSApp.mainWindow,
+        // The front document window, even while the app isn't active.
+        guard let front = NSApp.keyWindow ?? NSApp.mainWindow
+                ?? NSApp.orderedWindows.first(where: { $0.windowController?.document != nil }),
               let host = Optional(front.sheetParent ?? front), host.windowController?.document != nil else {
             // No document window in front (e.g. the welcome window): a plain new document.
             NSDocumentController.shared.newDocument(nil)
@@ -172,6 +174,9 @@ enum WindowTabs {
 final class TabsModel: ObservableObject {
     static let shared = TabsModel()
     @Published private(set) var tick = 0
+    /// Per tab group: how far the tab strip is scrolled, so each tab's strip
+    /// shows the same scroll.
+    var stripScroll: [ObjectIdentifier: CGFloat] = [:]
     private var titleObservations: [NSKeyValueObservation] = []
 
     private init() {

@@ -211,62 +211,66 @@ struct ContentView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
+            // The tabs take whatever room the status items on the right leave.
             TabStrip(window: { session.textView?.window }, export: { session.exportCleanCopy() })
                 .padding(.leading, 66)  // clear of the window buttons
-            Spacer()
-            if let busy = session.busy {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.mini)
-                    Text(busy)
-                }
-                .font(.system(size: 11.5))
-                .foregroundStyle(Color.inkSecondary)
-            }
-            UpdatePill()
-            if fileURL == nil {
-                Button {
-                    NSApp.sendAction(#selector(NSDocument.save(_:)), to: nil, from: nil)
-                } label: {
-                    HStack(spacing: 5) {
-                        Circle().fill(Color.inkSecondary.opacity(0.7)).frame(width: 5, height: 5)
-                        Text("Not saved")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 12) {
+                if let busy = session.busy {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.mini)
+                        Text(busy)
                     }
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(Color.inkSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .contentShape(Capsule())
+                }
+                UpdatePill()
+                if fileURL == nil {
+                    Button {
+                        NSApp.sendAction(#selector(NSDocument.save(_:)), to: nil, from: nil)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle().fill(Color.inkSecondary.opacity(0.7)).frame(width: 5, height: 5)
+                            Text("Not saved")
+                        }
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Color.inkSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandOnHover()
+                    .help("This document isn't saved to a file yet. Click to choose a name and folder (⌘S).")
+                }
+                if let vim = session.vimStatus, !session.previewing {
+                    Text(vim)
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .tracking(0.8)
+                        .foregroundStyle(vim.hasPrefix("INSERT") ? Color.inkSecondary.opacity(0.6) : Color.accent)
+                }
+                if session.previewing {
+                    Text("Preview")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Color.accent)
+                }
+                Button {
+                    session.featuresOn.toggle()
+                } label: {
+                    Text("\(session.wordCount) \(session.wordCount == 1 ? "word" : "words")")
+                        .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                        .foregroundStyle(session.featuresOn ? Color.accent : Color.inkSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(session.featuresOn ? Color.accent.opacity(0.1) : .clear))
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .pointingHandOnHover()
-                .help("This document isn't saved to a file yet. Click to choose a name and folder (⌘S).")
+                .tourAnchor(.wordCount)
+                .help(session.featuresOn ? "Hide writing tools (\(AppShortcut.toggleTools.label))" : "Show writing tools (\(AppShortcut.toggleTools.label))")
             }
-            if let vim = session.vimStatus, !session.previewing {
-                Text(vim)
-                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                    .tracking(0.8)
-                    .foregroundStyle(vim.hasPrefix("INSERT") ? Color.inkSecondary.opacity(0.6) : Color.accent)
-            }
-            if session.previewing {
-                Text("Preview")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Color.accent)
-            }
-            Button {
-                session.featuresOn.toggle()
-            } label: {
-                Text("\(session.wordCount) \(session.wordCount == 1 ? "word" : "words")")
-                    .font(.system(size: 11.5, weight: .medium).monospacedDigit())
-                    .foregroundStyle(session.featuresOn ? Color.accent : Color.inkSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(session.featuresOn ? Color.accent.opacity(0.1) : .clear))
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .pointingHandOnHover()
-            .tourAnchor(.wordCount)
-            .help(session.featuresOn ? "Hide writing tools (\(AppShortcut.toggleTools.label))" : "Show writing tools (\(AppShortcut.toggleTools.label))")
+            .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
