@@ -6,6 +6,7 @@ import SwiftUI
 struct FileTitle: View {
     let fileURL: URL?
     let window: () -> NSWindow?
+    var export: (() -> Void)? = nil
     @Binding var visible: Bool
     @State private var showDetails = false
     @State private var hovering = false
@@ -46,7 +47,7 @@ struct FileTitle: View {
         .allowsHitTesting(shown)
         .popover(isPresented: $showDetails, arrowEdge: .bottom) {
             if let fileURL {
-                FileDetails(fileURL: fileURL, window: window) { showDetails = false }
+                FileDetails(fileURL: fileURL, window: window, close: { showDetails = false }, export: export)
             }
         }
     }
@@ -56,6 +57,7 @@ struct FileDetails: View {
     let fileURL: URL
     let window: () -> NSWindow?
     let close: () -> Void
+    var export: (() -> Void)? = nil
     @State private var renaming = false
     @State private var newName = ""
     @State private var error: String?
@@ -118,6 +120,13 @@ struct FileDetails: View {
                         NSPasteboard.general.setString(fileURL.path, forType: .string)
                         close()
                     }
+                    if let export {
+                        action("Export…", "square.and.arrow.up") {
+                            close()
+                            export()
+                        }
+                        .help("Export a clean copy (⌥⇧⌘E)")
+                    }
                     action("Rename…", "pencil") {
                         newName = fileURL.deletingPathExtension().lastPathComponent
                         error = nil
@@ -129,7 +138,7 @@ struct FileDetails: View {
             .font(.system(size: 12, weight: .medium))
         }
         .padding(14)
-        .frame(width: 340, alignment: .leading)
+        .frame(width: 420, alignment: .leading)
     }
 
     private func action(_ title: String, _ icon: String, _ run: @escaping () -> Void) -> some View {

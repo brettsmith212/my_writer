@@ -23,7 +23,7 @@ mywriter draft.md    # open a file (created if it doesn't exist)
    Quit with ⌘Q and your documents reopen where you left off; close a window and it stays closed. With nothing open, MyWriter shows a welcome window with your recent files.
 2. **Click the word count** (top right) to bring in the writing tools. Click it again to hide them.
 3. **Select some text.** A small bar offers Alternatives, AI, Ghost and Stash.
-4. **Take the tour** from the **?** button, or open the practice document from the Help menu.
+4. **Take the tour** from the Help menu, where you'll also find the practice document, every shortcut (⌘/) and Send Feedback.
 
 ## Features
 

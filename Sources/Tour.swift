@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Places in the window the tour can point at.
 enum TourAnchor: Hashable {
-    case wordCount, alternativesButton, overflowButton, labButton, previewButton, helpButton
+    case wordCount, alternativesButton, overflowButton, labButton, previewButton
 }
 
 struct TourAnchorKey: PreferenceKey {
@@ -73,15 +73,14 @@ struct TourStep {
         ),
         TourStep(
             anchor: .previewButton,
-            title: "Preview and share",
-            body: "See your Markdown rendered, without ghosted text. The button next to it posts to X or copies clean text.",
+            title: "Preview",
+            body: "See your Markdown rendered, without ghosted text. When you're done, File → Export Clean Copy saves the finished piece (it's also in the file name's menu at the top edge).",
             needsTools: true
         ),
         TourStep(
-            anchor: .helpButton,
+            anchor: nil,
             title: "That's it",
-            body: "Come back here any time for this tour, every shortcut (\(AppShortcut.shortcutsCard.label)), or a practice document to play with. Vim mode and AI live in Settings (⌘,).",
-            needsTools: true
+            body: "Find this tour, shortcuts and feedback anytime in the Help menu, or press \(AppShortcut.shortcutsCard.label) for every shortcut. Vim mode and AI live in Settings (⌘,)."
         ),
     ] }
 }

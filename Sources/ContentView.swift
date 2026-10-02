@@ -53,7 +53,7 @@ struct ContentView: View {
                 .opacity(session.previewing ? 0 : 1)
             }
             .overlay(alignment: .top) {
-                FileTitle(fileURL: fileURL, window: { session.textView?.window }, visible: $showFileTitle)
+                FileTitle(fileURL: fileURL, window: { session.textView?.window }, export: { session.exportCleanCopy() }, visible: $showFileTitle)
                     .padding(.top, 8)
             }
             .overlay(alignment: .top) { topBar }
@@ -271,36 +271,6 @@ struct ContentView: View {
                 session.previewing.toggle()
             }
             .tourAnchor(.previewButton)
-            Menu {
-                Button("Post to X…") { session.postToX() }
-                Divider()
-                Button("Export Clean Copy…") { session.exportCleanCopy() }
-                Button("Copy Clean Text") { session.copyCleanText() }
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.inkSecondary)
-                    .frame(width: 28, height: 26)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .hoverLabel("Share")
-            Menu {
-                Button("Take the Tour") { session.startTour() }
-                Button("Keyboard Shortcuts") { session.showShortcuts = true }
-                Button("Open Practice Document") { PracticeDocument.open() }
-            } label: {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.inkSecondary)
-                    .frame(width: 28, height: 26)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .hoverLabel("Help & tour", extendsLeft: true)
-            .tourAnchor(.helpButton)
         }
         .padding(4)
         .background(Capsule().fill(Color.panel.opacity(0.92)))
