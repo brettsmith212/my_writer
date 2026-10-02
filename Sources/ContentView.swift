@@ -263,11 +263,11 @@ struct ContentView: View {
                 session.rightPanel = session.rightPanel == .overflow ? nil : .overflow
             }
             .tourAnchor(.overflowButton)
-            ToolButton(icon: "flask", active: session.rightPanel == .lab, help: "Lab: AI editing · \(AppShortcut.labPanel.label)") {
+            ToolButton(icon: "flask", active: session.rightPanel == .lab, help: "Lab: AI editing · \(AppShortcut.labPanel.label)", labelExtendsLeft: true) {
                 session.rightPanel = session.rightPanel == .lab ? nil : .lab
             }
             .tourAnchor(.labButton)
-            ToolButton(icon: "eye", active: session.previewing, help: "Preview · \(AppShortcut.preview.label)") {
+            ToolButton(icon: "eye", active: session.previewing, help: "Preview · \(AppShortcut.preview.label)", labelExtendsLeft: true) {
                 session.previewing.toggle()
             }
             .tourAnchor(.previewButton)
@@ -337,6 +337,8 @@ private struct ToolButton: View {
     let icon: String
     let active: Bool
     let help: String
+    /// Grow the hover label leftward (for buttons near the window's right edge).
+    var labelExtendsLeft = false
     let action: () -> Void
 
     var body: some View {
@@ -349,7 +351,7 @@ private struct ToolButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .hoverLabel(help)
+        .hoverLabel(help, extendsLeft: labelExtendsLeft)
     }
 }
 
