@@ -6,6 +6,15 @@
     <description>Updates for MyWriter. Written by `make release`; don't edit by hand.</description>
     <language>en</language>
     <item>
+      <title>MyWriter 0.2.2</title>
+      <pubDate>Fri, 02 Oct 2026 21:47:41 GMT</pubDate>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>Hand cursor on everything clickable in the panels and dialogs; hover states on icon buttons and Lab result cards</li><li>Debug: simulate a disconnected ChatGPT account for testing the Connect AI card</li><li>Command style: Alternatives ⌥⌘A and AI alternatives ⌥⌘I, matching the other ⌥⌘ shortcuts</li><li>First-run polish: Connect AI card when ChatGPT isn&#x27;t connected, hover states on toast buttons, ChatGPT first in providers, pointer cursor across Settings</li><li>Appcast: MyWriter 0.2.1</li></ul>]]></description>
+      <enclosure url="https://github.com/brettsmith212/my_writer/releases/download/v0.2.2/MyWriter-0.2.2.dmg" length="5308947" type="application/octet-stream" sparkle:edSignature="GmLCLJYPGt8zvsix5mAivs1xiwFNqvpyyMlCr9pOD2P8jj8oMu4oaOfhX1QsHYpUMvELVGuVczDf0Btcbw1aBg=="/>
+    </item>
+    <item>
       <title>MyWriter 0.2.1</title>
       <pubDate>Fri, 02 Oct 2026 21:25:45 GMT</pubDate>
       <sparkle:version>3</sparkle:version>
