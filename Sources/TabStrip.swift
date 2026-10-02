@@ -222,10 +222,45 @@ struct MouseArea: NSViewRepresentable {
         private var start: NSPoint?
         private var dragging = false
 
+        /// The window was movable before the pointer came over this view.
+        private var windowWasMovable: Bool?
+
         override var mouseDownCanMoveWindow: Bool { false }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+        // In the title bar, macOS starts moving the window before the app
+        // sees the press. So while the pointer is over this view, the window
+        // isn't movable; dragging anywhere else in the top bar still moves it.
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        }
+
+        override func mouseEntered(with event: NSEvent) { holdWindow() }
+
+        override func mouseExited(with event: NSEvent) {
+            if start == nil { releaseWindow() }
+        }
+
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            releaseWindow()
+            super.viewWillMove(toWindow: newWindow)
+        }
+
+        private func holdWindow() {
+            guard let window, windowWasMovable == nil else { return }
+            windowWasMovable = window.isMovable
+            window.isMovable = false
+        }
+
+        private func releaseWindow() {
+            if let windowWasMovable { window?.isMovable = windowWasMovable }
+            windowWasMovable = nil
+        }
+
         override func mouseDown(with event: NSEvent) {
+            holdWindow()
             start = event.locationInWindow
             dragging = false
         }
@@ -242,6 +277,8 @@ struct MouseArea: NSViewRepresentable {
             if dragging { dragEnded() } else if start != nil { click() }
             start = nil
             dragging = false
+            // Released outside the tab: the window can move again.
+            if !bounds.contains(convert(event.locationInWindow, from: nil)) { releaseWindow() }
         }
     }
 }
