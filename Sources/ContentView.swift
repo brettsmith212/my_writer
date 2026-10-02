@@ -317,6 +317,7 @@ struct ContentView: View {
                 Text(message).font(.system(size: 12)).foregroundStyle(Color.ink)
                 SettingsLink { Text("Settings").font(.system(size: 12, weight: .medium)) }
                     .buttonStyle(ToastButtonStyle(tint: Color.accent))
+                    .simultaneousGesture(TapGesture().onEnded { SettingsView.showAITab() })
                     .pointingHandOnHover()
                 Button { session.errorMessage = nil } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
                     .buttonStyle(ToastButtonStyle(tint: Color.inkSecondary))

@@ -15,13 +15,19 @@ struct SettingsView: View {
     @AppStorage("vimEnabled") private var vimEnabled = false
     @AppStorage("vimScreenLines") private var vimScreenLines = true
     @AppStorage("vimMappings") private var vimMappings = VimEngine.defaultMappings
+    /// The open tab; set to "ai" by links that lead here from AI setup.
+    @AppStorage(SettingsView.tabKey) private var selectedTab = "ai"
+    static let tabKey = "settingsTab"
+
+    /// Opens Settings on the AI tab next time (call just before a SettingsLink fires).
+    static func showAITab() { UserDefaults.standard.set("ai", forKey: tabKey) }
 
     @State private var anthropicKey = ""
     @State private var openAIKey = ""
     @State private var status: String?
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             tab {
                 Section("Connection") {
                 Picker("Connect with", selection: $provider) {
@@ -52,6 +58,7 @@ struct SettingsView: View {
                 }
             }
             .tabItem { Label("AI", systemImage: "sparkles") }
+            .tag("ai")
 
             tab {
                 Section("Writing") {
@@ -64,6 +71,7 @@ struct SettingsView: View {
                 UpdatesSection()
             }
             .tabItem { Label("Editor", systemImage: "textformat") }
+            .tag("editor")
 
             tab {
                 Section("Shortcuts") {
@@ -103,6 +111,7 @@ struct SettingsView: View {
                 }
             }
             .tabItem { Label("Keyboard", systemImage: "keyboard") }
+            .tag("keyboard")
         }
         .frame(width: 540)
         .task {

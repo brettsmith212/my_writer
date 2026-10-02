@@ -5,6 +5,9 @@ import SwiftUI
 struct AISetupSheet: View {
     @ObservedObject private var chatGPT = ChatGPTAuth.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var hoveringSignIn = false
+    @State private var hoveringSettings = false
+    @State private var hoveringLater = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -38,6 +41,10 @@ struct AISetupSheet: View {
             .tint(Color.accent)
             .controlSize(.large)
             .disabled(chatGPT.signingIn)
+            .brightness(hoveringSignIn && !chatGPT.signingIn ? 0.06 : 0)
+            .scaleEffect(hoveringSignIn && !chatGPT.signingIn ? 1.01 : 1)
+            .onHover { hoveringSignIn = $0 }
+            .animation(.easeOut(duration: 0.12), value: hoveringSignIn)
             .pointingHandOnHover()
 
             if let error = chatGPT.lastError {
@@ -50,11 +57,15 @@ struct AISetupSheet: View {
             HStack(spacing: 4) {
                 Text("Have an Anthropic or OpenAI API key?")
                     .foregroundStyle(Color.inkSecondary)
-                SettingsLink { Text("Use it in Settings") }
+                SettingsLink { Text("Use it in Settings").underline(hoveringSettings) }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accent)
+                    .onHover { hoveringSettings = $0 }
                     .pointingHandOnHover()
-                    .simultaneousGesture(TapGesture().onEnded { dismiss() })
+                    .simultaneousGesture(TapGesture().onEnded {
+                        SettingsView.showAITab()
+                        dismiss()
+                    })
             }
             .font(.system(size: 11.5))
 
@@ -64,7 +75,13 @@ struct AISetupSheet: View {
             }
             .buttonStyle(.plain)
             .font(.system(size: 12))
-            .foregroundStyle(Color.inkSecondary)
+            .foregroundStyle(hoveringLater ? Color.ink : Color.inkSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.ink.opacity(hoveringLater ? 0.07 : 0)))
+            .contentShape(Capsule())
+            .onHover { hoveringLater = $0 }
+            .animation(.easeOut(duration: 0.12), value: hoveringLater)
             .keyboardShortcut(.cancelAction)
             .pointingHandOnHover()
         }

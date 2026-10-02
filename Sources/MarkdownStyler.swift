@@ -51,7 +51,7 @@ enum MarkdownStyler {
         guard showAlternates else { return }
         let full = NSRange(location: 0, length: ts.length)
         ts.enumerateAttribute(.variantGroup, in: range) { value, r, _ in
-            guard let id = value as? String, let group = groups[id], group.options.count > 1 else { return }
+            guard let id = value as? String, let group = groups[id], !group.options.isEmpty else { return }
             var run = NSRange()
             _ = ts.attribute(.variantGroup, at: r.location, longestEffectiveRange: &run, in: full)
             let last = NSMaxRange(run) - 1

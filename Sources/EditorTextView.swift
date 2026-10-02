@@ -501,7 +501,7 @@ final class EditorTextView: NSTextView {
 
         ts.enumerateAttribute(.variantGroup, in: NSRange(location: 0, length: ts.length)) { value, range, _ in
             guard let id = value as? String, range.length > 0,
-                  let group = session.doc.groups[id], group.options.count > 1 else { return }
+                  let group = session.doc.groups[id], !group.options.isEmpty else { return }
             let glyphs = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             guard glyphs.length > 0 else { return }
             let hovered = id == hoveredGroup

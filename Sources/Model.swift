@@ -84,7 +84,7 @@ enum MarkdownCodec {
         if openGhost { out += spanClose }
 
         let keptGroups = groups.values
-            .filter { used.contains($0.id) && $0.options.count > 1 }
+            .filter { used.contains($0.id) && !$0.options.isEmpty }
             .sorted { $0.id < $1.id }
         if keptGroups.isEmpty && overflow.isEmpty { return out }
 
