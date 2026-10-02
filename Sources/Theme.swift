@@ -122,3 +122,32 @@ extension Color {
     static let aiTint = Color(nsColor: Theme.ai)
     static let hairline = Color(nsColor: Theme.hairline)
 }
+
+/// Light or dark pages: follow the Mac (the default), or always one or the other.
+enum AppearanceSetting: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    static let key = "appearance"
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: "System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    static var current: AppearanceSetting {
+        AppearanceSetting(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system
+    }
+
+    /// Applies the saved choice to every window.
+    @MainActor static func apply() {
+        switch current {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}

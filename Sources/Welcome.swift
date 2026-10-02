@@ -13,7 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.set(true, forKey: "NSQuitAlwaysKeepsWindows")
         defaults.set(false, forKey: "NSShowAppCentricOpenPanelInsteadOfUntitledFile")
         Self.routeEmptyLaunchesToWelcome()
-        MainActor.assumeIsolated { WindowTabs.installHooks() }
+        MainActor.assumeIsolated {
+            WindowTabs.installHooks()
+            AppearanceSetting.apply()
+        }
     }
 
     /// SwiftUI's document apps answer "open a blank document?" themselves and

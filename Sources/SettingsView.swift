@@ -13,6 +13,7 @@ struct SettingsView: View {
     @ObservedObject private var anthropicModels = AnthropicModels.shared
     @AppStorage("ai.anthropic.workspace") private var anthropicWorkspace = ""
     @AppStorage("soundsEnabled") private var soundsEnabled = true
+    @AppStorage(AppearanceSetting.key) private var appearance = AppearanceSetting.system.rawValue
     @AppStorage("hideMarkdownSyntax") private var hideMarkdown = true
     @AppStorage("shortcutStyle") private var shortcutStyle = AppShortcut.Style.command.rawValue
     @AppStorage("vimEnabled") private var vimEnabled = false
@@ -64,6 +65,17 @@ struct SettingsView: View {
             .tag("ai")
 
             tab {
+                Section("Appearance") {
+                Picker("Light or dark", selection: $appearance) {
+                    ForEach(AppearanceSetting.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .pointingHandOnHover()
+                .onChange(of: appearance) { AppearanceSetting.apply() }
+                Text("System follows your Mac's Light or Dark setting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 Section("Writing") {
                 Toggle("Hide Markdown symbols outside the line you're editing", isOn: $hideMarkdown)
                 .pointingHandOnHover()
