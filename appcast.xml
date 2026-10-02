@@ -6,6 +6,15 @@
     <description>Updates for MyWriter. Written by `make release`; don't edit by hand.</description>
     <language>en</language>
     <item>
+      <title>MyWriter 0.2.3</title>
+      <pubDate>Fri, 02 Oct 2026 23:40:34 GMT</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>Tab strip handles many tabs and long names</li><li>Tab strip: clicks and drags reach the selected and hovered tabs, and dragging a tab never moves the window</li><li>Tab strip: the window isn&#x27;t movable while the pointer is over a tab, so a real drag reorders tabs instead of moving the window</li><li>Tabs: no system tab bar flash, crossfade into new tabs, drag in the strip moves tabs (not the window), MyWriter&#x27;s own Show All Tabs with drag to reorder</li><li>New tabs slide straight into the tab group (no separate window first); drag tabs in the strip to reorder</li><li>Show All Tabs +: re-enable system tabbing and adopt new windows into the open overview&#x27;s tabs</li><li>The + in Show All Tabs adds a tab, not a new window</li><li>Tabs: ⌘T new tab, MyWriter&#x27;s own quiet tab strip in place of the system bar, Show All Tabs (⇧⌘\ or pinch), ⌃Tab to switch</li><li>Hover labels stay centered on their button but slide inward to stay inside the window</li><li>Revert &quot;Lab and Preview hover labels open leftward so they stay inside the window&quot;</li><li>Lab and Preview hover labels open leftward so they stay inside the window</li><li>Anthropic: reasoning menu shows each model&#x27;s supported levels; hide models without structured output</li><li>Toolbar holds only the four writing tools; Export in the file popover; tour ends by pointing to the Help menu</li><li>Continue with ChatGPT button (official logo), Using ChatGPT plan label; Anthropic model list with workspace support; OpenAI defaults to the newest Astra model</li><li>OpenAI API key: model picker filled from the key&#x27;s available models, with refresh</li><li>Smooth Check for Updates: no checking window for fast answers; once shown it stays at least a second</li><li>Selection bar in Vim Visual modes (actions return to Normal); Command listed first in Modifier keys</li><li>Alternatives spots show their underline from the first version; Use it in Settings opens the AI tab; hover effects on the Connect AI card</li><li>Appcast: MyWriter 0.2.2</li></ul>]]></description>
+      <enclosure url="https://github.com/brettsmith212/my_writer/releases/download/v0.2.3/MyWriter-0.2.3.dmg" length="5813404" type="application/octet-stream" sparkle:edSignature="UD++7K7X+83yYWkD5586vG6z/lGQjj85iZ1ULhqgK5IlbS2JxkmHFN9cqJpfliliMMJEXNKLKekAWC4MozhbCw=="/>
+    </item>
+    <item>
       <title>MyWriter 0.2.2</title>
       <pubDate>Fri, 02 Oct 2026 21:47:41 GMT</pubDate>
       <sparkle:version>4</sparkle:version>
