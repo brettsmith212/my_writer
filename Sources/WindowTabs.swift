@@ -4,6 +4,11 @@ import AppKit
 /// ⌘W (Close) closes the tab, and the window with its last tab.
 @MainActor
 enum WindowTabs {
+    #if DEBUG
+    /// Whether the last new tab arrived already in the tab group (for tests).
+    static var debugArrivedTabbed: Bool?
+    #endif
+
     static func newTab() {
         guard let front = NSApp.keyWindow ?? NSApp.mainWindow,
               let host = Optional(front.sheetParent ?? front), host.windowController?.document != nil else {
@@ -12,8 +17,35 @@ enum WindowTabs {
             return
         }
         let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        // The new window is handed to the tab group the moment it's about to
+        // appear (see installTabbingHook), so it slides in as a tab and never
+        // shows as a separate window first.
+        pendingHost = host
         NSDocumentController.shared.newDocument(nil)
         adopt(into: host, excluding: existing, attempt: 0)
+    }
+
+    /// Moves a tab to a new position in its window's tabs, keeping the
+    /// current tab selected.
+    static func move(_ window: NSWindow, to index: Int) {
+        guard let group = window.tabGroup, let from = group.windows.firstIndex(of: window), from != index else { return }
+        let selected = group.selectedWindow
+        group.removeWindow(window)
+        group.insertWindow(window, at: max(0, min(index, group.windows.count)))
+        if let selected, group.windows.contains(selected) { group.selectedWindow = selected }
+        hideSystemTabBar(of: window)
+        TabsModel.shared.refresh()
+    }
+
+    /// The window a new tab should join, while one is being created.
+    static var pendingHost: NSWindow?
+
+    /// Routes the next new document window into `pendingHost`'s tabs as it is
+    /// first shown. Installed once at launch.
+    static func installTabbingHook() {
+        guard let original = class_getInstanceMethod(NSWindow.self, #selector(NSWindow.order(_:relativeTo:))),
+              let replacement = class_getInstanceMethod(NSWindow.self, #selector(NSWindow.mw_order(_:relativeTo:))) else { return }
+        method_exchangeImplementations(original, replacement)
     }
 
     /// Waits for the new document's window, then tabs it into the host window.
@@ -21,6 +53,10 @@ enum WindowTabs {
         if let window = NSApp.windows.first(where: {
             !existing.contains(ObjectIdentifier($0)) && $0.windowController?.document != nil
         }) {
+            pendingHost = nil
+            #if DEBUG
+            debugArrivedTabbed = window.tabGroup === host.tabGroup && (host.tabGroup?.windows.count ?? 0) > 1
+            #endif
             if window.tabGroup !== host.tabGroup || host.tabGroup == nil {
                 host.addTabbedWindow(window, ordered: .above)
             }
@@ -29,7 +65,7 @@ enum WindowTabs {
             TabsModel.shared.refresh()
             return
         }
-        guard attempt < 40 else { return }
+        guard attempt < 40 else { pendingHost = nil; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { adopt(into: host, excluding: existing, attempt: attempt + 1) }
     }
 }
@@ -106,5 +142,21 @@ final class TabsModel: ObservableObject {
             }
         }
         tick += 1
+    }
+}
+
+extension NSWindow {
+    /// Swapped with order(_:relativeTo:) by WindowTabs.installTabbingHook.
+    @objc func mw_order(_ place: NSWindow.OrderingMode, relativeTo otherWindow: Int) {
+        MainActor.assumeIsolated {
+            if place != .out, let host = WindowTabs.pendingHost, host !== self,
+               windowController?.document != nil, (tabGroup?.windows.count ?? 1) <= 1 {
+                WindowTabs.pendingHost = nil
+                host.addTabbedWindow(self, ordered: .above)
+                makeKey()
+                return
+            }
+            mw_order(place, relativeTo: otherWindow)  // the original
+        }
     }
 }

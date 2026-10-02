@@ -183,6 +183,19 @@ enum DebugSnapshot {
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
             case "newtab": WindowTabs.newTab()
+            case "movetab":
+                // movetab <from> <to>: reorder tabs of the front window's group.
+                if let group = (NSApp.keyWindow ?? NSApp.mainWindow)?.tabGroup,
+                   let from = Int(parts[safe: 1] ?? ""), let to = Int(parts[safe: 2] ?? ""), group.windows.indices.contains(from) {
+                    WindowTabs.move(group.windows[from], to: to)
+                }
+            case "taborder":
+                let group = (NSApp.keyWindow ?? NSApp.mainWindow)?.tabGroup
+                let line = "\(parts[safe: 2] ?? ""): \(group?.windows.map(\.title) ?? []) selected=\(group?.selectedWindow?.title ?? "-") visibleWindows=\(NSApp.windows.filter { $0.isVisible && $0.windowController?.document != nil }.count)\n"
+                if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+            case "arrived":
+                let line = "\(parts[safe: 2] ?? ""): arrivedTabbed=\(String(describing: WindowTabs.debugArrivedTabbed))\n"
+                if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "overview":
                 if let w = session.textView?.window { w.tabGroup?.isOverviewVisible = true }
             case "newdocplain": NSDocumentController.shared.newDocument(nil)

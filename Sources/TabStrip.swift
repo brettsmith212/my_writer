@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// MyWriter's own tab strip, in the top row beside the window buttons: quiet
 /// text tabs that match the page. Shown only when a window has two or more tabs.
@@ -6,6 +7,8 @@ struct TabStrip: View {
     let window: () -> NSWindow?
     let export: () -> Void
     @ObservedObject private var model = TabsModel.shared
+    /// The tab being dragged, while one is.
+    @State private var dragging: NSWindow?
 
     private struct Tab: Identifiable {
         let window: NSWindow
@@ -18,6 +21,14 @@ struct TabStrip: View {
         _ = model.tick
         guard let window = window(), let group = window.tabGroup, group.windows.count > 1 else { return [] }
         return group.windows.map(Tab.init)
+    }
+
+    /// SwiftUI doesn't report a drag that ends outside a drop target, so
+    /// clear the dragged state once the mouse button is up.
+    private func clearWhenReleased() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if NSEvent.pressedMouseButtons == 0 { dragging = nil } else { clearWhenReleased() }
+        }
     }
 
     var body: some View {
@@ -34,6 +45,13 @@ struct TabStrip: View {
                         select: { tab.window.makeKeyAndOrderFront(nil) },
                         close: { tab.window.performClose(nil) }
                     )
+                    .opacity(dragging === tab.window ? 0.35 : 1)
+                    .onDrag {
+                        dragging = tab.window
+                        clearWhenReleased()
+                        return NSItemProvider(object: tab.title as NSString)
+                    }
+                    .onDrop(of: [.text], delegate: TabDropDelegate(target: tab.window, dragging: $dragging))
                 }
                 Button { WindowTabs.newTab() } label: {
                     Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
@@ -43,8 +61,31 @@ struct TabStrip: View {
                 .help("New tab (⌘T)")
             }
             .transition(.opacity)
+            .animation(.easeOut(duration: 0.15), value: tabs.map(\.id))
         }
     }
+}
+
+/// Live reordering: as a dragged tab passes over another, it takes that
+/// tab's place.
+private struct TabDropDelegate: DropDelegate {
+    let target: NSWindow
+    @Binding var dragging: NSWindow?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging !== target, let group = target.tabGroup,
+              let to = group.windows.firstIndex(of: target) else { return }
+        WindowTabs.move(dragging, to: to)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+
+    func dropExited(info: DropInfo) {}
 }
 
 private struct TabItem: View {
