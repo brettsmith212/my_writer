@@ -206,7 +206,21 @@ struct SettingsView: View {
             }
         }
         .pointingHandOnHover()
-        reasoningPicker(.anthropic, $anthropicEffort)
+        let levels = anthropicModels.levels(for: anthropicModel.isEmpty ? AISettings.defaultAnthropicModel : anthropicModel)
+        if levels.isEmpty {
+            reasoningPicker(.anthropic, $anthropicEffort)
+        } else {
+            Picker("Reasoning", selection: $anthropicEffort) {
+                ForEach(levels, id: \.self) { Text(AISettings.title(forEffort: $0)).tag($0) }
+            }
+            .pointingHandOnHover()
+            .onChange(of: anthropicModel) { _, _ in
+                // A model without the chosen level falls back to the gentlest it has.
+                let now = anthropicModels.levels(for: anthropicModel.isEmpty ? AISettings.defaultAnthropicModel : anthropicModel)
+                if !now.isEmpty, !now.contains(anthropicEffort) { anthropicEffort = now.first ?? "low" }
+            }
+            caption("Levels this model supports. Used for alternatives, ?? and the Lab. Lower is faster; raise it if Lab results feel shallow.")
+        }
         HStack(spacing: 8) {
             Button("Refresh Models") { Task { await anthropicModels.load() } }
                 .pointingHandOnHover()

@@ -11,7 +11,11 @@ final class AnthropicModels: ObservableObject {
         let id: String
         let name: String
         let created: String
+        /// Reasoning (effort) levels the model accepts, least to most.
+        var levels: [String] = []
     }
+
+    private static let effortOrder = ["low", "medium", "high", "xhigh", "max"]
 
     @Published private(set) var models: [Model] = []
     @Published private(set) var loading = false
@@ -53,7 +57,13 @@ final class AnthropicModels: ObservableObject {
             needsWorkspace = false
             models = (json["data"] as? [[String: Any]] ?? []).compactMap { item in
                 guard let id = item["id"] as? String else { return nil }
-                return Model(id: id, name: item["display_name"] as? String ?? id, created: item["created_at"] as? String ?? "")
+                let capabilities = item["capabilities"] as? [String: Any] ?? [:]
+                func supported(_ value: Any?) -> Bool { ((value as? [String: Any])?["supported"] as? Bool) ?? false }
+                // MyWriter needs structured results; skip models that can't return them.
+                if !capabilities.isEmpty, !supported(capabilities["structured_outputs"]) { return nil }
+                let effort = capabilities["effort"] as? [String: Any] ?? [:]
+                let levels = Self.effortOrder.filter { supported(effort[$0]) }
+                return Model(id: id, name: item["display_name"] as? String ?? id, created: item["created_at"] as? String ?? "", levels: levels)
             }
             .sorted { $0.created > $1.created }
             lastError = models.isEmpty ? "No models are available to this key." : nil
@@ -61,5 +71,9 @@ final class AnthropicModels: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func levels(for id: String) -> [String] {
+        models.first { $0.id == id }?.levels ?? []
     }
 }
