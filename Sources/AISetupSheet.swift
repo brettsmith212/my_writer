@@ -88,7 +88,7 @@ struct ContinueWithChatGPTButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if busy {
-                    ProgressView().controlSize(.small).tint(.white)
+                    ProgressView().controlSize(.small).tint(Color.paper)
                 } else {
                     Image("ChatGPTLogo")
                         .renderingMode(.template)
@@ -99,15 +99,15 @@ struct ContinueWithChatGPTButton: View {
                 Text(busy ? "Finish signing in your browser…" : "Continue with ChatGPT")
                     .font(.system(size: 13, weight: .semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.paper)
             .padding(.horizontal, 16)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .frame(height: 34)
             .background(
+                // The page's ink: warm charcoal on light paper, warm white on dark.
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.black.opacity(hovering && !busy ? 0.82 : 1))
+                    .fill(Color.ink.opacity(hovering && !busy ? 0.86 : 1))
             )
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.white.opacity(0.14)))
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)

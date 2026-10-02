@@ -391,13 +391,16 @@ enum DebugSnapshot {
                 Sounds.shared.debugRenderAll(to: parts[1])
             case "snapview":
                 // snapview settings <path>: render a view offscreen.
-                if let which = parts[safe: 1], let path = parts[safe: 2] {
+                if let named = parts[safe: 1], let path = parts[safe: 2] {
+                    // A "-light" or "-dark" suffix picks the appearance.
+                    let which = named.replacingOccurrences(of: "-light", with: "").replacingOccurrences(of: "-dark", with: "")
                     let root = which == "aisetup" ? AnyView(AISetupSheet()) : which == "filedetails"
                         ? AnyView(FileDetails(fileURL: URL(fileURLWithPath: NSHomeDirectory() + "/Documents/Writing/Essays/The Case for Writing Slowly.md"), window: { nil }, close: {}, export: {}))
                         : AnyView(SettingsView())
                     let host = NSHostingView(rootView: root.background(Color(nsColor: .windowBackgroundColor)))
                     host.frame = which == "aisetup" ? NSRect(x: 0, y: 0, width: 380, height: 360) : which == "filedetails" ? NSRect(x: 0, y: 0, width: 420, height: 130) : NSRect(x: 0, y: 0, width: 540, height: 530)
-                    host.appearance = session.textView?.effectiveAppearance
+                    host.appearance = named.hasSuffix("-light") ? NSAppearance(named: .aqua)
+                        : named.hasSuffix("-dark") ? NSAppearance(named: .darkAqua) : session.textView?.effectiveAppearance
                     host.layoutSubtreeIfNeeded()
                     if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
                         host.cacheDisplay(in: host.bounds, to: rep)
