@@ -39,6 +39,30 @@ if [[ -z "$sign_update" ]]; then
     sign_update=$(find build/SourcePackages/artifacts -path "*Sparkle/bin/sign_update" | head -1)
 fi
 [[ -n "$sign_update" ]] || { echo "Couldn't find Sparkle's sign_update tool." >&2; exit 1; }
+
+# The update key: this Mac must hold the private key matching the public key
+# built into the app, or installed copies would reject the update.
+expected_key=$(grep SUPublicEDKey project.yml | head -1 | awk '{print $2}')
+this_mac_key=$("$(dirname "$sign_update")/generate_keys" -p 2>/dev/null | tail -1 || true)
+if [[ "$this_mac_key" != "$expected_key" ]]; then
+    if [[ -z "$this_mac_key" || "$this_mac_key" == *rror* ]]; then
+        echo "This Mac doesn't have the MyWriter update key." >&2
+    else
+        echo "This Mac has a different update key than the app expects." >&2
+    fi
+    echo "Import it from your backup: paste it into a file, then run" >&2
+    echo "  $(dirname "$sign_update")/generate_keys -f <file>   (and delete the file)" >&2
+    exit 1
+fi
+
+# Up to date with GitHub: releasing from a stale copy could reuse a build
+# number or drop an earlier release from the update feed.
+git fetch -q origin
+branch=$(git rev-parse --abbrev-ref HEAD)
+if ! git merge-base --is-ancestor "origin/$branch" HEAD 2>/dev/null; then
+    echo "Your copy is behind GitHub. Run 'git pull' first, then release." >&2
+    exit 1
+fi
 xcrun notarytool history --keychain-profile MyWriter >/dev/null 2>&1 || {
     echo "Notarization credentials missing. Run: xcrun notarytool store-credentials MyWriter --apple-id <email> --team-id KFY97BH6J8" >&2
     exit 1
