@@ -8,7 +8,7 @@ import SwiftUI
 /// Standard Mac commands (⌘S, ⌘Z, ⌘C, ⌘,) never change.
 enum AppShortcut: CaseIterable {
     case toggleTools, alternatives, aiAlternatives, nextAlternative, previousAlternative
-    case ghost, stash, overflowPanel, labPanel, preview, zen, copyClean, shortcutsCard
+    case ghost, stash, overflowPanel, labPanel, preview, zen, copyClean, allTabs, shortcutsCard
 
     enum Style: String, CaseIterable, Identifiable {
         case command, control  // the default first
@@ -34,14 +34,17 @@ enum AppShortcut: CaseIterable {
         case .preview: "Preview Markdown"
         case .zen: "Zen mode"
         case .copyClean: "Copy clean text"
+        case .allTabs: "Show all tabs"
         case .shortcutsCard: "Keyboard shortcuts"
         }
     }
 
     /// The key and modifiers for the given style.
     func binding(_ style: Style = AppShortcut.style) -> (key: KeyEquivalent, modifiers: EventModifiers) {
-        // Like ⌘, for Settings, ⌘/ opens the shortcuts card in either style.
+        // Like ⌘, for Settings, ⌘/ (the shortcuts card) and ⇧⌘\ (Show All
+        // Tabs) are the same in either style.
         if self == .shortcutsCard { return ("/", [.command]) }
+        if self == .allTabs { return ("\\", [.command, .shift]) }
         switch style {
         case .control:
             let letter: Character = switch self {
@@ -57,6 +60,7 @@ enum AppShortcut: CaseIterable {
             case .preview: "p"
             case .zen: "z"
             case .copyClean: "c"
+            case .allTabs: "\\"  // unused: always ⇧⌘\ (see binding)
             case .shortcutsCard: "/"  // unused: always ⌘/ (see binding)
             }
             return (KeyEquivalent(letter), [.control, .shift])
@@ -74,6 +78,7 @@ enum AppShortcut: CaseIterable {
             case .preview: return ("p", [.command, .option])
             case .zen: return ("z", [.command, .control])
             case .copyClean: return ("c", [.command, .shift])
+            case .allTabs: return ("\\", [.command, .shift])
             case .shortcutsCard: return ("/", [.command])
             }
         }
@@ -106,7 +111,7 @@ enum AppShortcut: CaseIterable {
         guard style == .control else { return nil }
         let flags = event.modifierFlags.intersection([.control, .shift, .option, .command])
         guard flags == [.control, .shift], let key = event.charactersIgnoringModifiers?.lowercased().first else { return nil }
-        return allCases.first { $0 != .shortcutsCard && $0.binding(.control).key.character == key }
+        return allCases.first { $0 != .shortcutsCard && $0 != .allTabs && $0.binding(.control).key.character == key }
     }
 }
 
@@ -135,6 +140,7 @@ extension EditorSession {
         case .preview: previewing.toggle()
         case .zen: toggleZen()
         case .copyClean: copyCleanText()
+        case .allTabs: showingTabs.toggle()
         case .shortcutsCard: showShortcuts.toggle()
         }
     }

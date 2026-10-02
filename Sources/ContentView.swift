@@ -114,6 +114,14 @@ struct ContentView: View {
             }
         }
         .animation(.easeOut(duration: 0.16), value: session.showShortcuts)
+        .overlay {
+            if session.showingTabs, let window = session.textView?.window {
+                TabOverview(session: session, window: window)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: session.showingTabs)
         .sheet(isPresented: $session.showAISetup) { AISetupSheet() }
         .focusedSceneValue(\.editorSession, session)
         .onAppear {

@@ -1,7 +1,8 @@
 import AppKit
 
 /// Native window tabs: ⌘T opens a new document as a tab of the front window;
-/// ⌘W (Close) closes the tab, and the window with its last tab.
+/// ⌘W (Close) closes the tab, and the window with its last tab. MyWriter
+/// draws its own tab strip and Show All Tabs, so the system's are never shown.
 @MainActor
 enum WindowTabs {
     #if DEBUG
@@ -18,11 +19,24 @@ enum WindowTabs {
         }
         let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
         // The new window is handed to the tab group the moment it's about to
-        // appear (see installTabbingHook), so it slides in as a tab and never
-        // shows as a separate window first.
+        // appear (see installHooks), so it never shows as a separate window,
+        // and fades in over a picture of the page it replaces.
         pendingHost = host
+        pendingCurtain = snapshot(of: host)
         NSDocumentController.shared.newDocument(nil)
+        EditorSession.session(for: host)?.showingTabs = false
         adopt(into: host, excluding: existing, attempt: 0)
+    }
+
+    /// Brings a tab to the front, fading from the tab that was showing.
+    static func select(_ window: NSWindow) {
+        guard let current = window.tabGroup?.selectedWindow, current !== window else {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        let picture = snapshot(of: current)
+        window.makeKeyAndOrderFront(nil)
+        fadeIn(window, over: picture)
     }
 
     /// Moves a tab to a new position in its window's tabs, keeping the
@@ -33,70 +47,123 @@ enum WindowTabs {
         group.removeWindow(window)
         group.insertWindow(window, at: max(0, min(index, group.windows.count)))
         if let selected, group.windows.contains(selected) { group.selectedWindow = selected }
-        hideSystemTabBar(of: window)
         TabsModel.shared.refresh()
     }
 
     /// The window a new tab should join, while one is being created.
     static var pendingHost: NSWindow?
+    private static var pendingCurtain: NSImage?
 
-    /// Routes the next new document window into `pendingHost`'s tabs as it is
-    /// first shown. Installed once at launch.
-    static func installTabbingHook() {
-        guard let original = class_getInstanceMethod(NSWindow.self, #selector(NSWindow.order(_:relativeTo:))),
-              let replacement = class_getInstanceMethod(NSWindow.self, #selector(NSWindow.mw_order(_:relativeTo:))) else { return }
-        method_exchangeImplementations(original, replacement)
+    /// Called by the ordering hook as the new tab is first shown.
+    fileprivate static func arrive(_ window: NSWindow, in host: NSWindow) {
+        pendingHost = nil
+        window.animationBehavior = .none
+        host.addTabbedWindow(window, ordered: .above)
+        fadeIn(window, over: pendingCurtain)
+        pendingCurtain = nil
     }
 
-    /// Waits for the new document's window, then tabs it into the host window.
+    /// Waits for the new document's window, then tabs it into the host window
+    /// (only needed if the ordering hook didn't catch it).
     private static func adopt(into host: NSWindow, excluding existing: Set<ObjectIdentifier>, attempt: Int) {
         if let window = NSApp.windows.first(where: {
             !existing.contains(ObjectIdentifier($0)) && $0.windowController?.document != nil
         }) {
-            pendingHost = nil
             #if DEBUG
-            debugArrivedTabbed = window.tabGroup === host.tabGroup && (host.tabGroup?.windows.count ?? 0) > 1
+            debugArrivedTabbed = pendingHost == nil && window.tabGroup === host.tabGroup
             #endif
-            if window.tabGroup !== host.tabGroup || host.tabGroup == nil {
-                host.addTabbedWindow(window, ordered: .above)
-            }
+            if pendingHost != nil { arrive(window, in: host) }
             window.makeKeyAndOrderFront(nil)
-            hideSystemTabBar(of: window)
             TabsModel.shared.refresh()
             return
         }
-        guard attempt < 40 else { pendingHost = nil; return }
+        guard attempt < 40 else { pendingHost = nil; pendingCurtain = nil; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { adopt(into: host, excluding: existing, attempt: attempt + 1) }
     }
-}
 
-extension WindowTabs {
-    /// MyWriter draws its own tab strip, so the system's tab bar stays hidden.
-    /// macOS keeps that bar showing whenever a window has two or more tabs, so
-    /// hide its view in the window frame directly. If a future macOS renames
-    /// it, the only effect is that the system bar shows again.
-    static func hideSystemTabBar(of window: NSWindow?) {
-        guard let frame = window?.contentView?.superview else { return }
-        func hide(in view: NSView) {
-            for sub in view.subviews {
-                if String(describing: type(of: sub)).contains("TabBar") {
-                    if !sub.isHidden { sub.isHidden = true }
-                } else {
-                    hide(in: sub)
-                }
+    // MARK: Crossfade
+
+    /// A picture of a window as it looks now.
+    static func snapshot(of window: NSWindow) -> NSImage? {
+        guard let view = window.contentView?.superview, view.bounds.width > 0,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let image = NSImage(size: view.bounds.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    /// Lays a picture over the window's page and fades it away, so switching
+    /// tabs reads as one page dissolving into the next.
+    static func fadeIn(_ window: NSWindow, over picture: NSImage?) {
+        guard let picture, let content = window.contentView, let frameView = content.superview else { return }
+        let curtain = Curtain(frame: content.frame)
+        curtain.autoresizingMask = [.width, .height]
+        curtain.wantsLayer = true
+        curtain.layer?.contents = picture
+        curtain.layer?.contentsGravity = .resize
+        frameView.addSubview(curtain, positioned: .above, relativeTo: content)
+        // A beat for the new page to lay out underneath, then dissolve.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                curtain.animator().alphaValue = 0
+            } completionHandler: {
+                curtain.removeFromSuperview()
             }
         }
-        hide(in: frame)
+    }
+
+    /// Never takes clicks.
+    private final class Curtain: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+
+    // MARK: Hooks
+
+    /// Installed once at launch:
+    /// - new tab windows join their tab group as they're first shown;
+    /// - Show All Tabs (⇧⌘\) opens MyWriter's own overview;
+    /// - the system tab bar is hidden from the moment it's created, so it
+    ///   never flashes. If a future macOS renames it, the only effect is that
+    ///   the system bar shows again.
+    static func installHooks() {
+        exchange(#selector(NSWindow.order(_:relativeTo:)), #selector(NSWindow.mw_order(_:relativeTo:)))
+        exchange(#selector(NSWindow.toggleTabOverview(_:)), #selector(NSWindow.mw_toggleTabOverview(_:)))
+        hideSystemTabBars()
+    }
+
+    private static func exchange(_ original: Selector, _ replacement: Selector) {
+        guard let a = class_getInstanceMethod(NSWindow.self, original),
+              let b = class_getInstanceMethod(NSWindow.self, replacement) else { return }
+        method_exchangeImplementations(a, b)
+    }
+
+    private static func hideSystemTabBars() {
+        guard let tabBar = NSClassFromString("NSTabBar") else { return }
+        let setHidden = #selector(setter: NSView.isHidden)
+        if let method = class_getInstanceMethod(tabBar, setHidden) {
+            typealias SetHidden = @convention(c) (NSView, Selector, Bool) -> Void
+            let original = unsafeBitCast(method_getImplementation(method), to: SetHidden.self)
+            let block: @convention(block) (NSView, Bool) -> Void = { view, _ in original(view, setHidden, true) }
+            class_replaceMethod(tabBar, setHidden, imp_implementationWithBlock(block), method_getTypeEncoding(method))
+        }
+        let moved = #selector(NSView.viewDidMoveToWindow)
+        if let method = class_getInstanceMethod(tabBar, moved) {
+            typealias Moved = @convention(c) (NSView, Selector) -> Void
+            let original = unsafeBitCast(method_getImplementation(method), to: Moved.self)
+            let block: @convention(block) (NSView) -> Void = { view in
+                original(view, moved)
+                view.isHidden = true
+            }
+            class_replaceMethod(tabBar, moved, imp_implementationWithBlock(block), method_getTypeEncoding(method))
+        }
     }
 
     static func showAllTabs() {
         guard let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
-        if let group = window.tabGroup { group.isOverviewVisible = true } else { window.toggleTabOverview(nil) }
-    }
-
-    static func selectNextTab(_ forward: Bool) {
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
-        if forward { window.selectNextTab(nil) } else { window.selectPreviousTab(nil) }
+        EditorSession.session(for: window.sheetParent ?? window)?.showingTabs = true
     }
 }
 
@@ -114,19 +181,6 @@ final class TabsModel: ObservableObject {
                 MainActor.assumeIsolated { TabsModel.shared.refresh() }
             }
         }
-        // A new document window that appears while a tab overview is open came
-        // from the overview's +: make it a tab of that window, not a new window.
-        center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { note in
-            MainActor.assumeIsolated {
-                guard let window = note.object as? NSWindow, window.windowController?.document != nil,
-                      (window.tabGroup?.windows.count ?? 1) <= 1,
-                      let host = NSApp.windows.first(where: { $0 !== window && $0.tabGroup?.isOverviewVisible == true })
-                else { return }
-                host.addTabbedWindow(window, ordered: .above)
-                window.makeKeyAndOrderFront(nil)
-                TabsModel.shared.refresh()
-            }
-        }
         // A closing window is still listed until the close finishes.
         center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { TabsModel.shared.refresh() } }
@@ -135,7 +189,6 @@ final class TabsModel: ObservableObject {
 
     func refresh() {
         let documentWindows = NSApp.windows.filter { $0.windowController?.document != nil }
-        documentWindows.forEach { WindowTabs.hideSystemTabBar(of: $0) }
         titleObservations = documentWindows.map { window in
             window.observe(\.title) { _, _ in
                 DispatchQueue.main.async { MainActor.assumeIsolated { TabsModel.shared.tick += 1 } }
@@ -146,17 +199,27 @@ final class TabsModel: ObservableObject {
 }
 
 extension NSWindow {
-    /// Swapped with order(_:relativeTo:) by WindowTabs.installTabbingHook.
+    /// Swapped with order(_:relativeTo:) by WindowTabs.installHooks.
     @objc func mw_order(_ place: NSWindow.OrderingMode, relativeTo otherWindow: Int) {
         MainActor.assumeIsolated {
             if place != .out, let host = WindowTabs.pendingHost, host !== self,
                windowController?.document != nil, (tabGroup?.windows.count ?? 1) <= 1 {
-                WindowTabs.pendingHost = nil
-                host.addTabbedWindow(self, ordered: .above)
+                WindowTabs.arrive(self, in: host)
                 makeKey()
                 return
             }
             mw_order(place, relativeTo: otherWindow)  // the original
+        }
+    }
+
+    /// Swapped with toggleTabOverview(_:) by WindowTabs.installHooks.
+    @objc func mw_toggleTabOverview(_ sender: Any?) {
+        MainActor.assumeIsolated {
+            if let session = EditorSession.session(for: self) {
+                session.showingTabs.toggle()
+            } else {
+                mw_toggleTabOverview(sender)  // the original
+            }
         }
     }
 }

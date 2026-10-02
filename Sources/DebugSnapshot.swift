@@ -36,6 +36,39 @@ import Markdown
     return result
 }
 
+/// Frame-by-frame capture of this app's windows only, for checking transitions.
+@MainActor enum Recorder {
+    private typealias FromArray = @convention(c) (CGRect, CFArray, UInt32) -> Unmanaged<CGImage>?
+    private static var frames: [CGImage] = []
+
+    static func start(dir: String, frame: NSRect, seconds: Double) {
+        guard let handle = dlopen(nil, RTLD_NOW), let symbol = dlsym(handle, "CGWindowListCreateImageFromArray") else { return }
+        let capture = unsafeBitCast(symbol, to: FromArray.self)
+        // Screen coordinates for CoreGraphics run top-down from the main screen's top.
+        let screenH = NSScreen.screens.first?.frame.height ?? 0
+        let rect = CGRect(x: frame.minX, y: screenH - frame.maxY, width: frame.width, height: frame.height)
+        frames = []
+        let end = Date().addingTimeInterval(seconds)
+        Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { timer in
+            MainActor.assumeIsolated {
+                let ids = NSApp.orderedWindows.filter { $0.isVisible }.map { UnsafeRawPointer(bitPattern: UInt($0.windowNumber)) }
+                var pointers = ids
+                let array = CFArrayCreate(nil, &pointers, pointers.count, nil)!
+                if let image = capture(rect, array, 1 << 0 /* boundsIgnoreFraming */)?.takeRetainedValue() { frames.append(image) }
+                if Date() > end {
+                    timer.invalidate()
+                    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+                    for (i, image) in frames.enumerated() {
+                        let rep = NSBitmapImageRep(cgImage: image)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: String(format: "%@/%03d.png", dir, i)))
+                    }
+                    frames = []
+                }
+            }
+        }
+    }
+}
+
 enum DebugSnapshot {
     private static var sessions = NSHashTable<EditorSession>.weakObjects()
 
@@ -72,7 +105,7 @@ enum DebugSnapshot {
         if let session = sessions.allObjects.first(where: { $0.textView?.window?.isVisible == true }) {
             switch parts[0] {
             case "wait": delay = Double(parts[safe: 1] ?? "") ?? 0.5
-            case "snap": if let w = session.textView?.window { snap(w, to: parts[1]) }
+            case "snap": if let w = NSApp.keyWindow ?? session.textView?.window { snap(w, to: parts[1]) }
             case "features": session.featuresOn = parts[safe: 1] == "on"
             case "zen": session.toggleZen()
             case "newdoc": NSDocumentController.shared.newDocument(nil)
@@ -181,6 +214,56 @@ enum DebugSnapshot {
                 let line = "\(parts[safe: 2] ?? ""): showShortcuts=\(session.showShortcuts)\n"
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "hideshortcuts": session.showShortcuts = false
+            case "rec":
+                // rec <dir> <seconds>: capture MyWriter's own windows (over the
+                // front window's frame) about 60 times a second, as <dir>/NNN.png.
+                if let dir = parts[safe: 1], let frame = (NSApp.keyWindow ?? NSApp.mainWindow)?.frame {
+                    Recorder.start(dir: dir, frame: frame, seconds: Double(parts[safe: 2] ?? "") ?? 1)
+                }
+            case "viewtree":
+                // viewtree <path>: the front window's frame view hierarchy, by class.
+                var out = ""
+                func walk(_ v: NSView, _ depth: Int) {
+                    out += String(repeating: "  ", count: depth) + "\(type(of: v)) hidden=\(v.isHidden) \(v.frame)\n"
+                    if depth < 6 { v.subviews.forEach { walk($0, depth + 1) } }
+                }
+                if let frameView = (NSApp.keyWindow ?? NSApp.mainWindow)?.contentView?.superview { walk(frameView, 0) }
+                try? out.write(toFile: parts[1], atomically: true, encoding: .utf8)
+            case "mouse":
+                // mouse down|drag|up <x> <y>: a left-button event at a point in the
+                // front window, measured from its top-left corner.
+                let bits = step.split(separator: " ").map(String.init)
+                if let w = NSApp.keyWindow ?? NSApp.mainWindow, bits.count >= 4, let x = Double(bits[2]), let y = Double(bits[3]) {
+                    let type: NSEvent.EventType = bits[1] == "down" ? .leftMouseDown : bits[1] == "up" ? .leftMouseUp : .leftMouseDragged
+                    let point = NSPoint(x: x, y: w.frame.height - y)
+                    if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                        w.sendEvent(event)
+                    }
+                }
+                delay = 0.03
+            case "winframe":
+                let line = "\(parts[safe: 2] ?? ""): \(NSStringFromRect((NSApp.keyWindow ?? NSApp.mainWindow)?.frame ?? .zero)) overview=\(session.showingTabs)\n"
+                if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+                else { try? line.write(toFile: parts[1], atomically: true, encoding: .utf8) }
+            case "key":
+                // key <keyCode> <chars> [cmd][shift][opt]: a key press through the
+                // app, as if typed (menus and key monitors see it).
+                let bits = step.split(separator: " ").map(String.init)
+                if let w = NSApp.keyWindow ?? NSApp.mainWindow, bits.count >= 3, let code = UInt16(bits[1]) {
+                    let mods = bits.count > 3 ? bits[3] : ""
+                    var flags: NSEvent.ModifierFlags = []
+                    if mods.contains("cmd") { flags.insert(.command) }
+                    if mods.contains("shift") { flags.insert(.shift) }
+                    if mods.contains("opt") { flags.insert(.option) }
+                    let chars = bits[2] == "esc" ? "\u{1b}" : bits[2] == "ret" ? "\r" : bits[2]
+                    if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
+                                                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber,
+                                                    context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                                    isARepeat: false, keyCode: code) {
+                        NSApp.sendEvent(event)
+                    }
+                }
             case "quit": NSApp.terminate(nil)
             case "newtab": WindowTabs.newTab()
             case "movetab":
@@ -197,7 +280,7 @@ enum DebugSnapshot {
                 let line = "\(parts[safe: 2] ?? ""): arrivedTabbed=\(String(describing: WindowTabs.debugArrivedTabbed))\n"
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "overview":
-                if let w = session.textView?.window { w.tabGroup?.isOverviewVisible = true }
+                session.showingTabs = parts[safe: 1] != "off"
             case "newdocplain": NSDocumentController.shared.newDocument(nil)
             case "overviewplus":
                 // What the + in Show All Tabs sends.

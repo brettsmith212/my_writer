@@ -1,57 +1,55 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// MyWriter's own tab strip, in the top row beside the window buttons: quiet
 /// text tabs that match the page. Shown only when a window has two or more tabs.
+/// Drag a tab sideways to reorder; the others slide out of its way.
 struct TabStrip: View {
     let window: () -> NSWindow?
     let export: () -> Void
     @ObservedObject private var model = TabsModel.shared
-    /// The tab being dragged, while one is.
-    @State private var dragging: NSWindow?
+    @State private var frames: [ObjectIdentifier: CGRect] = [:]
+    @State private var drag: Drag?
 
-    private struct Tab: Identifiable {
-        let window: NSWindow
-        var id: ObjectIdentifier { ObjectIdentifier(window) }
-        var title: String { window.title.isEmpty ? "Untitled" : window.title }
-        var fileURL: URL? { (window.windowController?.document as? NSDocument)?.fileURL }
+    private static let spacing: CGFloat = 2
+
+    private struct Drag {
+        let id: ObjectIdentifier
+        let from: Int
+        let start: [ObjectIdentifier: CGRect]
+        let order: [ObjectIdentifier]
+        var dx: CGFloat = 0
+        var to: Int
+        /// Set as the tab settles into its new place, after release.
+        var settling = false
     }
 
-    private var tabs: [Tab] {
+    private var tabs: [TabInfo] {
         _ = model.tick
         guard let window = window(), let group = window.tabGroup, group.windows.count > 1 else { return [] }
-        return group.windows.map(Tab.init)
-    }
-
-    /// SwiftUI doesn't report a drag that ends outside a drop target, so
-    /// clear the dragged state once the mouse button is up.
-    private func clearWhenReleased() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if NSEvent.pressedMouseButtons == 0 { dragging = nil } else { clearWhenReleased() }
-        }
+        return group.windows.map(TabInfo.init)
     }
 
     var body: some View {
         let tabs = tabs
         if !tabs.isEmpty {
-            HStack(spacing: 2) {
-                ForEach(tabs) { tab in
+            HStack(spacing: Self.spacing) {
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                     TabItem(
                         title: tab.title,
                         fileURL: tab.fileURL,
                         selected: tab.window === window(),
                         window: { tab.window },
                         export: export,
-                        select: { tab.window.makeKeyAndOrderFront(nil) },
-                        close: { tab.window.performClose(nil) }
+                        select: { WindowTabs.select(tab.window) },
+                        close: { tab.window.performClose(nil) },
+                        dragChanged: { dragChanged(tab.id, index: index, dx: $0.width, tabs: tabs) },
+                        dragEnded: { dragEnded(tabs: tabs) }
                     )
-                    .opacity(dragging === tab.window ? 0.35 : 1)
-                    .onDrag {
-                        dragging = tab.window
-                        clearWhenReleased()
-                        return NSItemProvider(object: tab.title as NSString)
-                    }
-                    .onDrop(of: [.text], delegate: TabDropDelegate(target: tab.window, dragging: $dragging))
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: TabFramesKey.self, value: [tab.id: proxy.frame(in: .named("tabstrip"))])
+                    })
+                    .offset(x: offset(for: tab.id, index: index))
+                    .zIndex(drag?.id == tab.id ? 1 : 0)
                 }
                 Button { WindowTabs.newTab() } label: {
                     Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
@@ -60,32 +58,82 @@ struct TabStrip: View {
                 .pointingHandOnHover()
                 .help("New tab (⌘T)")
             }
+            .coordinateSpace(name: "tabstrip")
+            .onPreferenceChange(TabFramesKey.self) { frames = $0 }
             .transition(.opacity)
-            .animation(.easeOut(duration: 0.15), value: tabs.map(\.id))
+        }
+    }
+
+    /// Where a tab is drawn while one is being dragged: the dragged tab
+    /// follows the pointer; the tabs it has passed shift over by its width.
+    private func offset(for id: ObjectIdentifier, index: Int) -> CGFloat {
+        guard let drag, let dragged = drag.start[drag.id] else { return 0 }
+        if id == drag.id {
+            guard drag.settling else { return drag.dx }
+            return slotX(drag) - dragged.minX
+        }
+        let shift = dragged.width + Self.spacing
+        if drag.from < drag.to, index > drag.from, index <= drag.to { return -shift }
+        if drag.to < drag.from, index >= drag.to, index < drag.from { return shift }
+        return 0
+    }
+
+    /// Where the dragged tab's left edge lands at its new position.
+    private func slotX(_ drag: Drag) -> CGFloat {
+        guard let dragged = drag.start[drag.id] else { return 0 }
+        let target = drag.start[drag.order[drag.to]] ?? dragged
+        return drag.to > drag.from ? target.maxX - dragged.width : target.minX
+    }
+
+    private func dragChanged(_ id: ObjectIdentifier, index: Int, dx: CGFloat, tabs: [TabInfo]) {
+        if drag == nil || drag?.id != id {
+            drag = Drag(id: id, from: index, start: frames, order: tabs.map(\.id), to: index)
+        }
+        guard var current = drag, !current.settling, let dragged = current.start[id] else { return }
+        current.dx = dx
+        // The new position: how many of the other tabs' centers the dragged
+        // tab's center has passed.
+        let center = dragged.midX + dx
+        let others = current.order.filter { $0 != id }
+        let to = others.filter { (current.start[$0]?.midX ?? 0) < center }.count
+        if to != current.to {
+            current.to = to
+            withAnimation(.easeOut(duration: 0.16)) { drag = current }
+        } else {
+            drag = current
+        }
+    }
+
+    private func dragEnded(tabs: [TabInfo]) {
+        guard var current = drag else { return }
+        let window = tabs.first { $0.id == current.id }?.window
+        current.settling = true
+        withAnimation(.easeOut(duration: 0.14)) { drag = current }
+        // Once settled, make the move for real, without animation: the strip
+        // is already drawn in its new order.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                if let window, current.to != current.from { WindowTabs.move(window, to: current.to) }
+                drag = nil
+            }
         }
     }
 }
 
-/// Live reordering: as a dragged tab passes over another, it takes that
-/// tab's place.
-private struct TabDropDelegate: DropDelegate {
-    let target: NSWindow
-    @Binding var dragging: NSWindow?
+struct TabInfo: Identifiable {
+    let window: NSWindow
+    var id: ObjectIdentifier { ObjectIdentifier(window) }
+    var title: String { window.title.isEmpty ? "Untitled" : window.title }
+    var fileURL: URL? { (window.windowController?.document as? NSDocument)?.fileURL }
+}
 
-    func dropEntered(info: DropInfo) {
-        guard let dragging, dragging !== target, let group = target.tabGroup,
-              let to = group.windows.firstIndex(of: target) else { return }
-        WindowTabs.move(dragging, to: to)
+struct TabFramesKey: PreferenceKey {
+    static let defaultValue: [ObjectIdentifier: CGRect] = [:]
+    static func reduce(value: inout [ObjectIdentifier: CGRect], nextValue: () -> [ObjectIdentifier: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
-        return true
-    }
-
-    func dropExited(info: DropInfo) {}
 }
 
 private struct TabItem: View {
@@ -96,6 +144,8 @@ private struct TabItem: View {
     let export: () -> Void
     let select: () -> Void
     let close: () -> Void
+    let dragChanged: (CGSize) -> Void
+    let dragEnded: () -> Void
     @State private var hovering = false
     @State private var showDetails = false
 
@@ -114,6 +164,7 @@ private struct TabItem: View {
                 .foregroundStyle(selected ? Color.ink : Color.inkSecondary)
                 .lineLimit(1)
                 .fixedSize()
+                .allowsHitTesting(false)
             Button(action: close) {
                 Image(systemName: "xmark").font(.system(size: 7.5, weight: .bold))
             }
@@ -127,10 +178,16 @@ private struct TabItem: View {
         .background(
             Capsule().fill(selected ? Color.ink.opacity(0.07) : hovering ? Color.ink.opacity(0.04) : .clear)
         )
-        .contentShape(Capsule())
-        .onTapGesture {
-            if selected { if fileURL != nil { showDetails.toggle() } } else { select() }
-        }
+        // Clicks and drags are read by an AppKit view: in the title bar,
+        // SwiftUI's own drag would move the whole window instead.
+        .background(
+            MouseArea(
+                click: { if selected { if fileURL != nil { showDetails.toggle() } } else { select() } },
+                dragChanged: dragChanged,
+                dragEnded: dragEnded
+            )
+            .clipShape(Capsule())
+        )
         .onHover { hovering = $0 }
         .pointingHandOnHover()
         .help(selected ? (fileURL == nil ? title : "Show where this file lives") : title)
@@ -140,5 +197,51 @@ private struct TabItem: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Reads clicks and drags with AppKit, and never lets a drag move the window.
+/// A press that moves more than a few points is a drag; otherwise a click.
+struct MouseArea: NSViewRepresentable {
+    var click: () -> Void
+    var dragChanged: (CGSize) -> Void
+    var dragEnded: () -> Void
+
+    func makeNSView(context: Context) -> Surface { Surface() }
+
+    func updateNSView(_ view: Surface, context: Context) {
+        view.click = click
+        view.dragChanged = dragChanged
+        view.dragEnded = dragEnded
+    }
+
+    final class Surface: NSView {
+        var click: () -> Void = {}
+        var dragChanged: (CGSize) -> Void = { _ in }
+        var dragEnded: () -> Void = {}
+        private var start: NSPoint?
+        private var dragging = false
+
+        override var mouseDownCanMoveWindow: Bool { false }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            start = event.locationInWindow
+            dragging = false
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let start else { return }
+            // Window coordinates run bottom-up; SwiftUI's run top-down.
+            let delta = CGSize(width: event.locationInWindow.x - start.x, height: start.y - event.locationInWindow.y)
+            if !dragging, hypot(delta.width, delta.height) > 4 { dragging = true }
+            if dragging { dragChanged(delta) }
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            if dragging { dragEnded() } else if start != nil { click() }
+            start = nil
+            dragging = false
+        }
     }
 }

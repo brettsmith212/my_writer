@@ -53,6 +53,21 @@ final class EditorSession: NSObject, ObservableObject {
     @Published var vimStatus: String?
     @Published var tourStep: Int?
     @Published var showShortcuts = false
+    /// Show All Tabs: this window's overview of its tabs.
+    @Published var showingTabs = false {
+        didSet { if showingTabs, !oldValue { captureTabPictures() } }
+    }
+    /// Pictures of this window's tabs, taken as Show All Tabs opens.
+    @Published private(set) var tabPictures: [ObjectIdentifier: NSImage] = [:]
+
+    private func captureTabPictures() {
+        guard let window = textView?.window else { return }
+        var pictures: [ObjectIdentifier: NSImage] = [:]
+        for tab in window.tabGroup?.windows ?? [window] {
+            pictures[ObjectIdentifier(tab)] = WindowTabs.snapshot(of: tab)
+        }
+        tabPictures = pictures
+    }
     @Published var zen: ZenState?
     @Published var showAISetup = false
     var zenObserver: NSObjectProtocol?
@@ -94,6 +109,11 @@ final class EditorSession: NSObject, ObservableObject {
         // A sheet (like the shortcuts card) counts as its parent window.
         let window = front.sheetParent ?? front
         return all.allObjects.first { $0.textView?.window == window }
+    }
+
+    /// The session shown in a window.
+    static func session(for window: NSWindow) -> EditorSession? {
+        all.allObjects.first { $0.textView?.window === window }
     }
 
     func attach(_ tv: EditorTextView) {

@@ -48,6 +48,8 @@ struct WriterCommands: Commands {
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
+            item("Show All Tabs", .allTabs)
+            Divider()
             Button("Actual Size") { Zoom.shared.reset() }
                 .keyboardShortcut("0", modifiers: .command)
             Button("Zoom In") { Zoom.shared.zoomIn() }

@@ -181,9 +181,7 @@ final class EditorTextView: NSTextView {
         case .changed:
             pinch += event.magnification
         case .ended, .cancelled:
-            if pinch < -0.25, let window {
-                if let group = window.tabGroup { group.isOverviewVisible = true } else { window.toggleTabOverview(nil) }
-            }
+            if pinch < -0.25 { session?.showingTabs = true }
             pinch = 0
         default:
             break

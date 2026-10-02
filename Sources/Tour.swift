@@ -215,7 +215,7 @@ struct ShortcutsSheet: View {
             ("Export clean copy", "⌥⇧⌘E"),
             ("Zoom in / out / actual size", "⌘+  ⌘−  ⌘0"),
             ("New tab / close tab", "⌘T  ⌘W"),
-            ("Show all tabs", "⇧⌘\\  or pinch in"),
+            ("Show all tabs", "\(AppShortcut.allTabs.label)  or pinch in"),
             ("Settings", "⌘,"),
             ("This card", "⌘/"),
         ]),
