@@ -1,0 +1,55 @@
+#!/bin/sh
+# mywriter: open files in MyWriter from the shell.
+#
+#   mywriter                 open MyWriter
+#   mywriter draft.md        open draft.md (created if it doesn't exist)
+#   mywriter a.md b.md       open several
+#   mywriter notes           same as notes.md when there's no extension
+
+BUNDLE_ID=com.brettsmith.MyWriter
+
+case "$1" in
+    -h|--help)
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+esac
+
+if [ $# -eq 0 ]; then
+    exec open -b "$BUNDLE_ID"
+fi
+
+for file in "$@"; do
+    case "$file" in
+        -*) echo "mywriter: unknown option $file" >&2; exit 2 ;;
+    esac
+done
+
+paths=""
+for file in "$@"; do
+    # A bare name with no extension becomes Markdown, like `mywriter notes`.
+    case "$(basename "$file")" in
+        *.*) ;;
+        *) [ -e "$file" ] || file="$file.md" ;;
+    esac
+    if [ ! -e "$file" ]; then
+        dir=$(dirname "$file")
+        if [ ! -d "$dir" ]; then
+            echo "mywriter: no such folder: $dir" >&2
+            exit 1
+        fi
+        : > "$file" || exit 1
+    fi
+    if [ -d "$file" ]; then
+        echo "mywriter: $file is a folder" >&2
+        exit 1
+    fi
+    paths="$paths
+$file"
+done
+
+# Hand the files to MyWriter, keeping spaces in names intact.
+printf '%s\n' "$paths" | sed '/^$/d' | tr '\n' '\0' | xargs -0 open -b "$BUNDLE_ID" || {
+    echo "mywriter: couldn't open MyWriter. Build it once with 'make run' or install it with 'make install'." >&2
+    exit 1
+}

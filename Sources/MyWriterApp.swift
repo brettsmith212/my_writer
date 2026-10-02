@@ -1,0 +1,111 @@
+import SwiftUI
+
+@main
+struct MyWriterApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    init() {
+        #if DEBUG
+        DebugSnapshot.scheduleIfRequested()
+        #endif
+        ShellCommand.setUpOnLaunch()
+        Zoom.shared.installPlusKey()
+        Updates.shared.start()
+    }
+
+    var body: some Scene {
+        DocumentGroup(newDocument: { WriterDocument() }) { file in
+            ContentView(doc: file.document, fileURL: file.fileURL)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 980, height: 760)
+        .commands { WriterCommands() }
+
+        Settings {
+            SettingsView()
+        }
+    }
+}
+
+struct EditorSessionKey: FocusedValueKey {
+    typealias Value = EditorSession
+}
+
+extension FocusedValues {
+    var editorSession: EditorSession? {
+        get { self[EditorSessionKey.self] }
+        set { self[EditorSessionKey.self] = newValue }
+    }
+}
+
+struct WriterCommands: Commands {
+    @FocusedValue(\.editorSession) private var focused
+    /// The window being worked in. Falls back to the key window's session when
+    /// SwiftUI hasn't reported focus, so menu shortcuts always reach it.
+    private var session: EditorSession? { focused ?? EditorSession.frontmost }
+    /// Read so the menus rebuild when the shortcut style changes.
+    @AppStorage("shortcutStyle") private var shortcutStyle = AppShortcut.Style.command.rawValue
+
+    var body: some Commands {
+        CommandGroup(before: .toolbar) {
+            Button("Actual Size") { Zoom.shared.reset() }
+                .keyboardShortcut("0", modifiers: .command)
+            Button("Zoom In") { Zoom.shared.zoomIn() }
+                .keyboardShortcut("=", modifiers: .command)
+            Button("Zoom Out") { Zoom.shared.zoomOut() }
+                .keyboardShortcut("-", modifiers: .command)
+            Divider()
+        }
+
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { Updates.shared.checkForUpdates() }
+        }
+
+        CommandGroup(after: .appSettings) {
+            Button("Install Shell Command…") { ShellCommand.installWithAlert() }
+        }
+
+        CommandGroup(after: .saveItem) {
+            Divider()
+            Group {
+                Button("Export Clean Copy…") { session?.exportCleanCopy() }
+                    .keyboardShortcut("e", modifiers: [.command, .option, .shift])
+                item("Copy Clean Text", .copyClean)
+                Button("Post to X…") { session?.postToX() }
+            }
+        }
+
+        CommandGroup(replacing: .help) {
+            Button("Take the Tour") { session?.startTour() }
+            item("Keyboard Shortcuts", .shortcutsCard)
+            Divider()
+            Button("Open Practice Document") { PracticeDocument.open() }
+        }
+
+        CommandMenu("Write") {
+            Group {
+                item("Toggle Writing Tools", .toggleTools)
+                item("Preview Markdown", .preview)
+                item("Zen Mode", .zen)
+                Divider()
+                item("Alternatives", .alternatives)
+                item("AI Alternatives for Selection", .aiAlternatives)
+                item("Next Alternative", .nextAlternative)
+                item("Previous Alternative", .previousAlternative)
+                Divider()
+                item("Ghost / Revive", .ghost)
+                item("Stash in Overflow", .stash)
+            }
+            Divider()
+            Group {
+                item("Overflow", .overflowPanel)
+                item("Lab", .labPanel)
+            }
+        }
+    }
+
+    private func item(_ title: String, _ shortcut: AppShortcut) -> some View {
+        Button(title) { session?.perform(shortcut) }
+            .keyboardShortcut(shortcut)
+    }
+}

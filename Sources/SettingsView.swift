@@ -1,0 +1,260 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @AppStorage("aiProvider") private var provider = AIProvider.chatGPT.rawValue
+    @AppStorage("ai.anthropic.model") private var anthropicModel = ""
+    @AppStorage("ai.anthropic.effort") private var anthropicEffort = "low"
+    @AppStorage("ai.openAI.model") private var openAIModel = ""
+    @AppStorage("ai.openAI.effort") private var openAIEffort = "low"
+    @AppStorage("ai.chatGPT.model") private var chatgptModel = ""
+    @AppStorage("ai.chatGPT.effort") private var chatgptEffort = AISettings.defaultEffort(.chatGPT)
+    @ObservedObject private var chatGPT = ChatGPTAuth.shared
+    @AppStorage("soundsEnabled") private var soundsEnabled = true
+    @AppStorage("hideMarkdownSyntax") private var hideMarkdown = true
+    @AppStorage("shortcutStyle") private var shortcutStyle = AppShortcut.Style.command.rawValue
+    @AppStorage("vimEnabled") private var vimEnabled = false
+    @AppStorage("vimScreenLines") private var vimScreenLines = true
+    @AppStorage("vimMappings") private var vimMappings = VimEngine.defaultMappings
+
+    @State private var anthropicKey = ""
+    @State private var openAIKey = ""
+    @State private var status: String?
+
+    var body: some View {
+        TabView {
+            tab {
+                Section("Connection") {
+                Picker("Connect with", selection: $provider) {
+                    ForEach(AIProvider.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+
+                switch AIProvider(rawValue: provider) ?? .chatGPT {
+                case .anthropic:
+                    SecureField("API key", text: $anthropicKey, prompt: Text("sk-ant-…"))
+                    saveRow { APIKeyStore.anthropic.save(anthropicKey) }
+                    caption("Stored in your Keychain. Falls back to ANTHROPIC_API_KEY.")
+                    Picker("Model", selection: $anthropicModel) {
+                        Text("Default (Claude Sonnet 5.5)").tag("")
+                        ForEach(AIClient.anthropicModels, id: \.id) { Text($0.name).tag($0.id) }
+                    }
+                    reasoningPicker(.anthropic, $anthropicEffort)
+                case .openAI:
+                    SecureField("API key", text: $openAIKey, prompt: Text("sk-…"))
+                    saveRow { APIKeyStore.openAI.save(openAIKey) }
+                    caption("Stored in your Keychain. Falls back to OPENAI_API_KEY.")
+                    TextField("Model", text: $openAIModel, prompt: Text(AIClient.defaultOpenAIModel))
+                    reasoningPicker(.openAI, $openAIEffort)
+                case .chatGPT:
+                    chatGPTSection
+                }
+                }
+            }
+            .tabItem { Label("AI", systemImage: "sparkles") }
+
+            tab {
+                Section("Writing") {
+                Toggle("Hide Markdown symbols outside the line you're editing", isOn: $hideMarkdown)
+                Toggle("Play sounds when cycling alternatives", isOn: $soundsEnabled)
+                }
+                ShellCommandSection()
+                UpdatesSection()
+            }
+            .tabItem { Label("Editor", systemImage: "textformat") }
+
+            tab {
+                Section("Shortcuts") {
+                Picker("Modifier keys", selection: $shortcutStyle) {
+                    ForEach(AppShortcut.Style.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                caption(shortcutStyle == AppShortcut.Style.control.rawValue
+                    ? "MyWriter's shortcuts use Control + Shift + a letter (⌃⇧A alternatives, ⌃⇧G ghost…), leaving plain Control keys for Vim and text editing. Standard Mac shortcuts like ⌘S stay the same."
+                    : "MyWriter's shortcuts use Command, Mac style (⇧⌘A alternatives, ⌥⌘G ghost…).")
+                }
+                Section("Vim") {
+                Toggle("Vim mode", isOn: $vimEnabled)
+                if vimEnabled {
+                    Toggle("Line motions follow wrapped lines", isOn: $vimScreenLines)
+                    caption(vimScreenLines
+                        ? "j k 0 ^ $ I A D C act on the line as you see it. dd cc yy o J still act on the whole paragraph."
+                        : "Strict Vim: a line is a whole paragraph. Use gj gk g0 g^ g$ for wrapped lines.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Key mappings")
+                        TextEditor(text: $vimMappings)
+                            .font(.system(size: 12, design: .monospaced))
+                            .frame(height: 110)
+                            .scrollContentBackground(.hidden)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+                        let errors = VimMappings.parse(vimMappings).errors
+                        if errors.isEmpty {
+                            caption("One per line, vimrc style: inoremap jk <Esc> · nnoremap Y y$ · vnoremap … Supports map, noremap, nmap, nnoremap, imap, inoremap, vmap, vnoremap, xmap. Lines starting with \" are comments.")
+                        } else {
+                            ForEach(errors, id: \.self) { Text($0).font(.caption).foregroundStyle(.red) }
+                        }
+                    }
+                }
+                }
+            }
+            .tabItem { Label("Keyboard", systemImage: "keyboard") }
+        }
+        .frame(width: 540)
+        .task {
+            await chatGPT.loadIfNeeded()
+            if chatGPT.isConnected && chatGPT.models.isEmpty { await chatGPT.loadModels() }
+        }
+        .onAppear {
+            Self.migrateLegacyModels()
+            anthropicKey = APIKeyStore.anthropic.storedKey() ?? ""
+            openAIKey = APIKeyStore.openAI.storedKey() ?? ""
+        }
+        .onChange(of: provider) { _, _ in status = nil }
+    }
+
+    /// One Settings tab: a grouped form that scrolls if it runs long, so the
+    /// window always fits the screen.
+    private func tab<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Form { content() }
+            .formStyle(.grouped)
+            .frame(width: 540, height: 470)
+    }
+
+    @ViewBuilder
+    private var chatGPTSection: some View {
+        if let connection = chatGPT.connection {
+            LabeledContent("Connected as") {
+                Text(connection.email ?? connection.name ?? "ChatGPT account")
+                    .textSelection(.enabled)
+            }
+            Picker("Model", selection: $chatgptModel) {
+                Text(chatGPT.defaultModel.map { "Default (\($0.displayName))" } ?? "Default").tag("")
+                ForEach(chatGPT.models) { Text($0.displayName).tag($0.slug) }
+                if !chatgptModel.isEmpty && !chatGPT.models.contains(where: { $0.slug == chatgptModel }) {
+                    Text(chatgptModel).tag(chatgptModel)
+                }
+            }
+            chatGPTReasoningPicker
+            HStack {
+                Button("Refresh Models") { Task { await chatGPT.loadModels() } }
+                Spacer()
+                Button("Disconnect", role: .destructive) { chatGPT.signOut() }
+            }
+            caption("Requests use your ChatGPT plan. Set usage limits for MyWriter in ChatGPT settings.")
+        } else if chatGPT.signingIn {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("Finish signing in in your browser…")
+                Spacer()
+                Button("Cancel") { chatGPT.cancelSignIn() }
+            }
+        } else {
+            HStack {
+                Spacer()
+                Button {
+                    chatGPT.signIn()
+                } label: {
+                    Text("Sign in with ChatGPT")
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 7)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.primary)
+                .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                Spacer()
+            }
+            caption("Opens your browser to sign in. MyWriter keeps the connection in your Keychain and never sees your password.")
+        }
+        if let error = chatGPT.lastError {
+            Text(error).font(.caption).foregroundStyle(.red)
+        }
+    }
+
+    /// The selected model's own reasoning levels, from the plan's catalog.
+    @ViewBuilder
+    private var chatGPTReasoningPicker: some View {
+        let model = chatGPT.models.first { $0.slug == (chatgptModel.isEmpty ? chatGPT.defaultModel?.slug : chatgptModel) }
+        let levels = model?.levels ?? []
+        Picker("Reasoning", selection: $chatgptEffort) {
+            Text(model?.defaultLevel.map { "Automatic (\(AISettings.title(forEffort: $0)))" } ?? "Automatic").tag("")
+            if levels.isEmpty {
+                ForEach(AISettings.efforts(for: .chatGPT).dropFirst(), id: \.value) { Text($0.title).tag($0.value) }
+            } else {
+                ForEach(levels, id: \.effort) { level in
+                    Text(AISettings.title(forEffort: level.effort) + (level.effort == "ultra" ? " (slowest)" : "")).tag(level.effort)
+                }
+            }
+        }
+        .onChange(of: chatgptModel) { _, _ in
+            // A model that doesn't offer the chosen level falls back to its own default.
+            let newModel = chatGPT.models.first { $0.slug == (chatgptModel.isEmpty ? chatGPT.defaultModel?.slug : chatgptModel) }
+            if let newModel, !newModel.levels.isEmpty, !chatgptEffort.isEmpty,
+               !newModel.levels.contains(where: { $0.effort == chatgptEffort }) {
+                chatgptEffort = ""
+            }
+        }
+        let description = levels.first { $0.effort == chatgptEffort }?.description
+        caption((description.map { $0 + ". " } ?? "") + "Used for alternatives, ?? and the Lab. Lower is faster.")
+    }
+
+    /// One model and one reasoning level drive every AI feature.
+    @ViewBuilder
+    private func reasoningPicker(_ provider: AIProvider, _ selection: Binding<String>) -> some View {
+        Picker("Reasoning", selection: selection) {
+            ForEach(AISettings.efforts(for: provider), id: \.value) { Text($0.title).tag($0.value) }
+        }
+        caption("Used for alternatives, ?? and the Lab. Lower is faster; raise it if Lab results feel shallow.")
+    }
+
+    private func saveRow(_ save: @escaping () -> Void) -> some View {
+        HStack {
+            Spacer()
+            if let status { Text(status).foregroundStyle(.secondary).font(.caption) }
+            Button("Save Key") {
+                save()
+                status = "Saved"
+            }
+        }
+    }
+
+    /// Earlier versions stored one model under different keys.
+    private static func migrateLegacyModels() {
+        let defaults = UserDefaults.standard
+        for (legacy, current) in [("chatgptModel", "ai.chatGPT.model"), ("aiModel", "ai.anthropic.model"), ("openAIModel", "ai.openAI.model")] {
+            if let value = defaults.string(forKey: legacy), !value.isEmpty, (defaults.string(forKey: current) ?? "").isEmpty {
+                defaults.set(value, forKey: current)
+            }
+            defaults.removeObject(forKey: legacy)
+        }
+    }
+
+    private func caption(_ text: String) -> some View {
+        Text(text).font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// Install or remove the `mywriter` terminal command.
+private struct ShellCommandSection: View {
+    @State private var installed = ShellCommand.installed
+
+    var body: some View {
+        Section("Shell command") {
+            LabeledContent {
+                if installed != nil {
+                    Button("Remove") {
+                        ShellCommand.uninstall()
+                        installed = ShellCommand.installed
+                    }
+                } else {
+                    Button("Install") {
+                        ShellCommand.installWithAlert()
+                        installed = ShellCommand.installed
+                    }
+                }
+            } label: {
+                Text("Open files from a terminal with `mywriter file.md`")
+                Text(installed.map { "Installed at " + $0.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~") }
+                     ?? "Not installed")
+            }
+        }
+    }
+}
