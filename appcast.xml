@@ -6,6 +6,15 @@
     <description>Updates for MyWriter. Written by `make release`; don't edit by hand.</description>
     <language>en</language>
     <item>
+      <title>MyWriter 0.2.1</title>
+      <pubDate>Fri, 02 Oct 2026 21:25:45 GMT</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>Disk image: arrow only, no hint text</li><li>Disk image with the standard drag-to-Applications layout: background, arrow, positioned icons</li><li>Keep the reading position when panels open or close; no re-wrap flicker</li><li>release: check for the update key and an up-to-date copy before building</li><li>MIT license; README for users first (install, privacy, feedback, development); Help → Send Feedback</li><li>release: push with an explicit remote and branch</li><li>Appcast: MyWriter 0.2.0</li></ul>]]></description>
+      <enclosure url="https://github.com/brettsmith212/my_writer/releases/download/v0.2.1/MyWriter-0.2.1.dmg" length="5248436" type="application/octet-stream" sparkle:edSignature="gB2DHDUOBc4NSkn2BtiidEbV2ihf3+Op9Y3IdzG6g/YqUmHgmOOtOtypTP3R/0nrYeG3bCDU4If4cVrBHcWuBQ=="/>
+    </item>
+    <item>
       <title>MyWriter 0.2.0</title>
       <pubDate>Fri, 02 Oct 2026 20:33:26 GMT</pubDate>
       <sparkle:version>2</sparkle:version>
