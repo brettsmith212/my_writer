@@ -176,7 +176,9 @@ private struct TabItem: View {
         .padding(.trailing, 4)
         .frame(height: 24)
         .background(
+            // Only drawn: a filled shape would take the click from the mouse area below.
             Capsule().fill(selected ? Color.ink.opacity(0.07) : hovering ? Color.ink.opacity(0.04) : .clear)
+                .allowsHitTesting(false)
         )
         // Clicks and drags are read by an AppKit view: in the title bar,
         // SwiftUI's own drag would move the whole window instead.
@@ -222,45 +224,69 @@ struct MouseArea: NSViewRepresentable {
         private var start: NSPoint?
         private var dragging = false
 
-        /// The window was movable before the pointer came over this view.
-        private var windowWasMovable: Bool?
-
         override var mouseDownCanMoveWindow: Bool { false }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-        // In the title bar, macOS starts moving the window before the app
-        // sees the press. So while the pointer is over this view, the window
-        // isn't movable; dragging anywhere else in the top bar still moves it.
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-            trackingAreas.forEach(removeTrackingArea)
-            addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        // MARK: Keeping the window still
+
+        /// In a window whose content runs under the title bar, macOS moves the
+        /// window from a press in the title bar before the app sees it, and
+        /// SwiftUI's hosting view decides which of its areas count. So each tab
+        /// keeps a companion view directly in the window frame, over the tab,
+        /// that marks the spot as not for moving the window and lets every
+        /// click through.
+        private var shield: Shield?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            shield?.removeFromSuperview()
+            shield = nil
+            guard let content = window?.contentView, let frameView = content.superview else { return }
+            let shield = Shield()
+            frameView.addSubview(shield, positioned: .above, relativeTo: content)
+            self.shield = shield
+            placeShield()
         }
 
-        override func mouseEntered(with event: NSEvent) { holdWindow() }
-
-        override func mouseExited(with event: NSEvent) {
-            if start == nil { releaseWindow() }
+        override func removeFromSuperview() {
+            shield?.removeFromSuperview()
+            shield = nil
+            super.removeFromSuperview()
         }
 
-        override func viewWillMove(toWindow newWindow: NSWindow?) {
-            releaseWindow()
-            super.viewWillMove(toWindow: newWindow)
+        override func setFrameOrigin(_ newOrigin: NSPoint) {
+            super.setFrameOrigin(newOrigin)
+            placeShield()
         }
 
-        private func holdWindow() {
-            guard let window, windowWasMovable == nil else { return }
-            windowWasMovable = window.isMovable
-            window.isMovable = false
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            placeShield()
         }
 
-        private func releaseWindow() {
-            if let windowWasMovable { window?.isMovable = windowWasMovable }
-            windowWasMovable = nil
+        override func layout() {
+            super.layout()
+            placeShield()
+        }
+
+        private func placeShield() {
+            guard let shield, let frameView = shield.superview else { return }
+            let rect = convert(bounds, to: frameView)
+            if shield.frame != rect { shield.frame = rect }
+        }
+
+        private final class Shield: NSView {
+            override var mouseDownCanMoveWindow: Bool { false }
+            /// Clicks pass through to the tab underneath.
+            override func hitTest(_ point: NSPoint) -> NSView? { nil }
+            /// Undocumented AppKit hook (Firefox uses it for its tabs too): the
+            /// part of this view that must not move the window. If a future
+            /// macOS drops it, dragging a tab moves the window again.
+            @objc(_opaqueRectForWindowMoveWhenInTitlebar)
+            func opaqueRectForWindowMoveWhenInTitlebar() -> NSRect { bounds }
         }
 
         override func mouseDown(with event: NSEvent) {
-            holdWindow()
             start = event.locationInWindow
             dragging = false
         }
@@ -277,8 +303,6 @@ struct MouseArea: NSViewRepresentable {
             if dragging { dragEnded() } else if start != nil { click() }
             start = nil
             dragging = false
-            // Released outside the tab: the window can move again.
-            if !bounds.contains(convert(event.locationInWindow, from: nil)) { releaseWindow() }
         }
     }
 }
