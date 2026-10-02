@@ -77,6 +77,8 @@ VERSION      = $(shell grep MARKETING_VERSION project.yml | head -1 | sed 's/.*"
 DMG          = dist/$(SCHEME)-$(VERSION).dmg
 NOTARY       ?= MyWriter
 DEVELOPER_ID := Developer ID Application
+# dmgbuild lays out the disk image window (installed into build/ on first use).
+DMGBUILD     := $(DD)/venv/bin/dmgbuild
 
 dmg: gen
 	@security find-identity -v -p codesigning | grep -q "$(DEVELOPER_ID)" || \
@@ -94,11 +96,9 @@ dmg: gen
 	done; \
 	codesign --force --sign "$(DEVELOPER_ID)" --options runtime --timestamp "$(RELEASE_APP)"
 	codesign --verify --deep --strict "$(RELEASE_APP)"
-	rm -rf $(DD)/dmg && mkdir -p $(DD)/dmg dist
-	cp -R $(RELEASE_APP) $(DD)/dmg/
-	ln -s /Applications $(DD)/dmg/Applications
-	rm -f $(DMG)
-	hdiutil create -volname "$(SCHEME) $(VERSION)" -srcfolder $(DD)/dmg -ov -format UDZO $(DMG)
+	@[ -x $(DMGBUILD) ] || { /usr/bin/python3 -m venv $(DD)/venv && $(DD)/venv/bin/pip install -q dmgbuild; }
+	mkdir -p dist && rm -f $(DMG)
+	$(DMGBUILD) -s Tools/dmg_settings.py -D app="$(RELEASE_APP)" -D background=Design/dmg-background.tiff "$(SCHEME) $(VERSION)" $(DMG)
 	codesign --sign "$(DEVELOPER_ID)" --timestamp $(DMG)
 	xcrun notarytool submit $(DMG) --keychain-profile $(NOTARY) --wait
 	xcrun stapler staple $(DMG)
