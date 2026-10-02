@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage("ai.chatGPT.effort") private var chatgptEffort = AISettings.defaultEffort(.chatGPT)
     @ObservedObject private var chatGPT = ChatGPTAuth.shared
     @ObservedObject private var openAIModels = OpenAIModels.shared
+    @ObservedObject private var anthropicModels = AnthropicModels.shared
+    @AppStorage("ai.anthropic.workspace") private var anthropicWorkspace = ""
     @AppStorage("soundsEnabled") private var soundsEnabled = true
     @AppStorage("hideMarkdownSyntax") private var hideMarkdown = true
     @AppStorage("shortcutStyle") private var shortcutStyle = AppShortcut.Style.command.rawValue
@@ -39,14 +41,12 @@ struct SettingsView: View {
                 switch AIProvider(rawValue: provider) ?? .chatGPT {
                 case .anthropic:
                     SecureField("API key", text: $anthropicKey, prompt: Text("sk-ant-…"))
-                    saveRow { APIKeyStore.anthropic.save(anthropicKey) }
-                    caption("Stored in your Keychain. Falls back to ANTHROPIC_API_KEY.")
-                    Picker("Model", selection: $anthropicModel) {
-                        Text("Default (Claude Sonnet 5.5)").tag("")
-                        ForEach(AIClient.anthropicModels, id: \.id) { Text($0.name).tag($0.id) }
+                    saveRow {
+                        APIKeyStore.anthropic.save(anthropicKey)
+                        Task { await anthropicModels.load() }
                     }
-                .pointingHandOnHover()
-                    reasoningPicker(.anthropic, $anthropicEffort)
+                    caption("Stored in your Keychain. Falls back to ANTHROPIC_API_KEY.")
+                    anthropicModelSection
                 case .openAI:
                     SecureField("API key", text: $openAIKey, prompt: Text("sk-…"))
                     saveRow {
@@ -119,6 +119,7 @@ struct SettingsView: View {
         .frame(width: 540)
         .task {
             if openAIModels.models.isEmpty, APIKeyStore.openAI.storedKey() != nil { await openAIModels.load() }
+            if anthropicModels.models.isEmpty, APIKeyStore.anthropic.storedKey() != nil { await anthropicModels.load() }
             await chatGPT.loadIfNeeded()
             if chatGPT.isConnected && chatGPT.models.isEmpty { await chatGPT.loadModels() }
         }
@@ -161,7 +162,7 @@ struct SettingsView: View {
                 Button("Disconnect", role: .destructive) { chatGPT.signOut() }
                 .pointingHandOnHover()
             }
-            caption("Requests use your ChatGPT plan. Set usage limits for MyWriter in ChatGPT settings.")
+            UsingChatGPTPlanLabel()
         } else if chatGPT.signingIn {
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
@@ -173,23 +174,50 @@ struct SettingsView: View {
         } else {
             HStack {
                 Spacer()
-                Button {
-                    chatGPT.signIn()
-                } label: {
-                    Text("Sign in with ChatGPT")
-                        .font(.system(size: 13, weight: .semibold))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 7)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.primary)
-                .foregroundStyle(Color(nsColor: .windowBackgroundColor))
-                .pointingHandOnHover()
+                ContinueWithChatGPTButton { chatGPT.signIn() }
                 Spacer()
             }
-            caption("Opens your browser to sign in. MyWriter keeps the connection in your Keychain and never sees your password.")
+            caption("Complete eligible AI requests with usage included in your ChatGPT plan. Opens your browser to sign in; MyWriter keeps the connection in your Keychain and never sees your password.")
         }
         if let error = chatGPT.lastError {
+            Text(error).font(.caption).foregroundStyle(.red)
+        }
+    }
+
+    /// Claude models this key can use (from Anthropic), with a refresh, and the
+    /// workspace field for keys that need one.
+    @ViewBuilder
+    private var anthropicModelSection: some View {
+        if anthropicModels.needsWorkspace || !anthropicWorkspace.isEmpty {
+            TextField("Workspace ID", text: $anthropicWorkspace, prompt: Text("wrkspc_…"))
+                .onSubmit { Task { await anthropicModels.load() } }
+            caption("Only needed for keys that aren't tied to a workspace. Find it in the Claude Console under Settings → Workspaces.")
+        }
+        Picker("Model", selection: $anthropicModel) {
+            Text("Default (Claude Sonnet 5.5)").tag("")
+            if anthropicModels.models.isEmpty {
+                ForEach(AIClient.anthropicModels, id: \.id) { Text($0.name).tag($0.id) }
+            } else {
+                ForEach(anthropicModels.models) { Text($0.name).tag($0.id) }
+            }
+            let known = anthropicModels.models.map(\.id) + AIClient.anthropicModels.map(\.id)
+            if !anthropicModel.isEmpty && !known.contains(anthropicModel) {
+                Text(anthropicModel).tag(anthropicModel)
+            }
+        }
+        .pointingHandOnHover()
+        reasoningPicker(.anthropic, $anthropicEffort)
+        HStack(spacing: 8) {
+            Button("Refresh Models") { Task { await anthropicModels.load() } }
+                .pointingHandOnHover()
+                .disabled(anthropicModels.loading || APIKeyStore.anthropic.key == nil)
+            if anthropicModels.loading { ProgressView().controlSize(.small) }
+            Spacer()
+            if !anthropicModels.models.isEmpty {
+                Text("\(anthropicModels.models.count) models").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        if let error = anthropicModels.lastError {
             Text(error).font(.caption).foregroundStyle(.red)
         }
     }
@@ -198,14 +226,14 @@ struct SettingsView: View {
     @ViewBuilder
     private var openAIModelSection: some View {
         Picker("Model", selection: $openAIModel) {
-            Text("Default (\(AIClient.defaultOpenAIModel))").tag("")
+            Text("Default (\(openAIModels.recommended ?? AIClient.defaultOpenAIModel))").tag("")
             ForEach(openAIModels.models) { Text($0.id).tag($0.id) }
             if !openAIModel.isEmpty && !openAIModels.models.contains(where: { $0.id == openAIModel }) {
                 Text(openAIModel).tag(openAIModel)
             }
         }
         .pointingHandOnHover()
-        let levels = openAIModels.levels(for: openAIModel.isEmpty ? AIClient.defaultOpenAIModel : openAIModel)
+        let levels = openAIModels.levels(for: openAIModel.isEmpty ? (openAIModels.recommended ?? AIClient.defaultOpenAIModel) : openAIModel)
         Picker("Reasoning", selection: $openAIEffort) {
             if levels.isEmpty {
                 ForEach(AISettings.efforts(for: .openAI), id: \.value) { Text($0.title).tag($0.value) }

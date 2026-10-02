@@ -189,6 +189,24 @@ enum DebugSnapshot {
                     let ids = OpenAIModels.parse(json).map(\.id).joined(separator: "\n")
                     try? (ids + "\n").write(toFile: parts[safe: 2] ?? "/dev/null", atomically: true, encoding: .utf8)
                 }
+            case "anthropicraw":
+                // anthropicraw <path>: the model list's field names and entries (never the key).
+                let path = parts[1]
+                Task {
+                    guard let key = APIKeyStore.anthropic.key else { try? "no key\n".write(toFile: path, atomically: true, encoding: .utf8); return }
+                    var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
+                    request.setValue(key, forHTTPHeaderField: "x-api-key")
+                    request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                    let (data, response) = (try? await URLSession.shared.data(for: request)) ?? (Data(), URLResponse())
+                    let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+                    let list = json["data"] as? [[String: Any]] ?? []
+                    var out = "status: \((response as? HTTPURLResponse)?.statusCode ?? 0)\nerror: \((json["error"] as? [String: Any])?["message"] ?? "-")\ntop-level keys: \(json.keys.sorted())\ncount: \(list.count)\n"
+                    if let first = list.first { out += "fields: \(first.keys.sorted())\nfirst: \(first)\n" }
+                    out += list.map { "\($0["id"] ?? "?")  |  \($0["display_name"] ?? "")" }.joined(separator: "\n") + "\n"
+                    try? out.write(toFile: path, atomically: true, encoding: .utf8)
+                }
+            case "loadmodels":
+                Task { await AnthropicModels.shared.load(); await OpenAIModels.shared.load() }
             case "openaimodels":
                 // openaimodels <path>: load the OpenAI key's models and write the parsed list.
                 let path = parts[1]

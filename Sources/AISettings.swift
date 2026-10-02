@@ -23,6 +23,11 @@ enum AISettings {
 
     static let defaultAnthropicModel = "claude-sonnet-5-5"
 
+    /// Workspace for Anthropic keys that aren't tied to one ("" when not needed).
+    static var anthropicWorkspace: String {
+        (UserDefaults.standard.string(forKey: "ai.anthropic.workspace") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static var anthropicModel: String {
         let stored = storedModel(.anthropic)
         if !stored.isEmpty { return stored }
@@ -33,7 +38,8 @@ enum AISettings {
         let stored = storedModel(.openAI)
         if !stored.isEmpty { return stored }
         let legacy = (UserDefaults.standard.string(forKey: "openAIModel") ?? "").trimmingCharacters(in: .whitespaces)
-        return legacy.isEmpty ? AIClient.defaultOpenAIModel : legacy
+        if !legacy.isEmpty { return legacy }
+        return UserDefaults.standard.string(forKey: OpenAIModels.recommendedKey) ?? AIClient.defaultOpenAIModel
     }
 
     /// Reasoning choices offered in Settings.

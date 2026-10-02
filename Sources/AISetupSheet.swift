@@ -5,7 +5,6 @@ import SwiftUI
 struct AISetupSheet: View {
     @ObservedObject private var chatGPT = ChatGPTAuth.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var hoveringSignIn = false
     @State private var hoveringSettings = false
     @State private var hoveringLater = false
 
@@ -21,31 +20,14 @@ struct AISetupSheet: View {
                 Text("Connect AI")
                     .font(.system(size: 20, weight: .semibold, design: .serif))
                     .foregroundStyle(Color.ink)
-                Text("AI alternatives and the Lab use your own AI account. Sign in with ChatGPT to use the plan you already have.")
+                Text("AI alternatives and the Lab use your own AI account. Continue with ChatGPT to use the plan you already have.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Color.inkSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button {
-                chatGPT.signIn()
-            } label: {
-                HStack(spacing: 8) {
-                    if chatGPT.signingIn { ProgressView().controlSize(.small) }
-                    Text(chatGPT.signingIn ? "Finish signing in your browser…" : "Sign in with ChatGPT")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.accent)
-            .controlSize(.large)
-            .disabled(chatGPT.signingIn)
-            .brightness(hoveringSignIn && !chatGPT.signingIn ? 0.06 : 0)
-            .scaleEffect(hoveringSignIn && !chatGPT.signingIn ? 1.01 : 1)
-            .onHover { hoveringSignIn = $0 }
-            .animation(.easeOut(duration: 0.12), value: hoveringSignIn)
-            .pointingHandOnHover()
+            ContinueWithChatGPTButton(busy: chatGPT.signingIn, fullWidth: true) { chatGPT.signIn() }
 
             if let error = chatGPT.lastError {
                 Text(error)
@@ -91,5 +73,72 @@ struct AISetupSheet: View {
         .onChange(of: chatGPT.isConnected) { _, connected in
             if connected { dismiss() }
         }
+    }
+}
+
+/// OpenAI's "Continue with ChatGPT" button: black, the white ChatGPT logo and
+/// the approved label (per OpenAI's Sign in with ChatGPT UI guidelines).
+struct ContinueWithChatGPTButton: View {
+    var busy = false
+    var fullWidth = false
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if busy {
+                    ProgressView().controlSize(.small).tint(.white)
+                } else {
+                    Image("ChatGPTLogo")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                }
+                Text(busy ? "Finish signing in your browser…" : "Continue with ChatGPT")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .frame(height: 34)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color.black.opacity(hovering && !busy ? 0.82 : 1))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.white.opacity(0.14)))
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .pointingHandOnHover()
+    }
+}
+
+/// "Using ChatGPT plan · Manage usage", shown when connected (per OpenAI's guidelines).
+struct UsingChatGPTPlanLabel: View {
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image("ChatGPTLogo")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 12, height: 12)
+                .foregroundStyle(.secondary)
+            Text("Using ChatGPT plan")
+                .foregroundStyle(.secondary)
+            Text("·").foregroundStyle(.tertiary)
+            Link(destination: URL(string: "https://chatgpt.com/#settings")!) {
+                Text("Manage usage").underline(hovering)
+            }
+            .onHover { hovering = $0 }
+            .pointingHandOnHover()
+        }
+        .font(.caption)
     }
 }

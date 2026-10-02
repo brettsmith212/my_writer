@@ -121,20 +121,37 @@ enum AIClient {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200, let json else {
             let message = (json?["error"] as? [String: Any])?["message"] as? String
-            throw AIError.http(message ?? "API error (HTTP \(status)).")
+            throw AIError.http(message.map(friendlyAnthropicError) ?? "API error (HTTP \(status)).")
         }
         return json
     }
 
+    /// Headers for every Anthropic request; adds the workspace when one is set
+    /// (needed for keys that aren't tied to a workspace).
+    static func anthropicHeaders(key: String) -> [String: String] {
+        var headers = ["x-api-key": key, "anthropic-version": "2023-06-01"]
+        let workspace = AISettings.anthropicWorkspace
+        if !workspace.isEmpty { headers["anthropic-workspace-id"] = workspace }
+        return headers
+    }
+
+    static func isWorkspaceError(_ message: String) -> Bool {
+        message.contains("not scoped to a workspace") || message.contains("anthropic-workspace-id")
+    }
+
+    static func friendlyAnthropicError(_ message: String) -> String {
+        isWorkspaceError(message)
+            ? "This key isn't tied to a workspace. Enter its Workspace ID in Settings → AI, or create a key inside a workspace in the Claude Console."
+            : message
+    }
+
     private static func anthropic(system: String, user: String, schema: [String: Any], model: String, effort: String) async throws -> String {
         guard let key = APIKeyStore.anthropic.key else { throw AIError.noKey("Anthropic") }
+        var headers = anthropicHeaders(key: key)
+        headers["anthropic-beta"] = "server-side-fallback-2026-07-01"
         let json = try await post(
             "https://api.anthropic.com/v1/messages",
-            headers: [
-                "x-api-key": key,
-                "anthropic-version": "2023-06-01",
-                "anthropic-beta": "server-side-fallback-2026-07-01",
-            ],
+            headers: headers,
             body: [
                 "model": model,
                 "max_tokens": 16000,

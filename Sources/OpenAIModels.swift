@@ -49,6 +49,7 @@ final class OpenAIModels: ObservableObject {
             models = Self.parse(json)
             lastError = models.isEmpty ? "No writing models are available to this key." : nil
             if let data = try? JSONEncoder().encode(models) { UserDefaults.standard.set(data, forKey: cacheKey) }
+            if let recommended { UserDefaults.standard.set(recommended, forKey: Self.recommendedKey) }
         } catch {
             lastError = error.localizedDescription
         }
@@ -59,7 +60,8 @@ final class OpenAIModels: ObservableObject {
     static func parse(_ json: [String: Any]) -> [Model] {
         let list = (json["data"] as? [[String: Any]]) ?? (json["models"] as? [[String: Any]]) ?? []
         let excluded = ["audio", "realtime", "tts", "transcribe", "search", "image", "embedding",
-                        "moderation", "instruct", "dall-e", "whisper", "davinci", "babbage", "computer-use"]
+                        "moderation", "instruct", "dall-e", "whisper", "davinci", "babbage", "computer-use",
+                        "live", "codex"]
         let dated = try! NSRegularExpression(pattern: #"-\d{4}-\d{2}-\d{2}$|-\d{4}$"#)
         return list.compactMap { item -> Model? in
             guard let id = (item["id"] as? String) ?? (item["slug"] as? String) else { return nil }
@@ -71,6 +73,14 @@ final class OpenAIModels: ObservableObject {
             return Model(id: id, created: item["created"] as? Int ?? 0, levels: levels)
         }
         .sorted { $0.created != $1.created ? $0.created > $1.created : $0.id < $1.id }
+    }
+
+    static let recommendedKey = "openAIDefaultModelCache"
+
+    /// The default when no model is chosen: the newest Astra model this key
+    /// has (matching the ChatGPT plan's default), else the newest model.
+    var recommended: String? {
+        models.first { $0.id.lowercased().contains("astra") }?.id ?? models.first?.id
     }
 
     func levels(for id: String) -> [String] {
