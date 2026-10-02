@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("ai.chatGPT.model") private var chatgptModel = ""
     @AppStorage("ai.chatGPT.effort") private var chatgptEffort = AISettings.defaultEffort(.chatGPT)
     @ObservedObject private var chatGPT = ChatGPTAuth.shared
+    @ObservedObject private var openAIModels = OpenAIModels.shared
     @AppStorage("soundsEnabled") private var soundsEnabled = true
     @AppStorage("hideMarkdownSyntax") private var hideMarkdown = true
     @AppStorage("shortcutStyle") private var shortcutStyle = AppShortcut.Style.command.rawValue
@@ -48,10 +49,12 @@ struct SettingsView: View {
                     reasoningPicker(.anthropic, $anthropicEffort)
                 case .openAI:
                     SecureField("API key", text: $openAIKey, prompt: Text("sk-…"))
-                    saveRow { APIKeyStore.openAI.save(openAIKey) }
+                    saveRow {
+                        APIKeyStore.openAI.save(openAIKey)
+                        Task { await openAIModels.load() }
+                    }
                     caption("Stored in your Keychain. Falls back to OPENAI_API_KEY.")
-                    TextField("Model", text: $openAIModel, prompt: Text(AIClient.defaultOpenAIModel))
-                    reasoningPicker(.openAI, $openAIEffort)
+                    openAIModelSection
                 case .chatGPT:
                     chatGPTSection
                 }
@@ -115,6 +118,7 @@ struct SettingsView: View {
         }
         .frame(width: 540)
         .task {
+            if openAIModels.models.isEmpty, APIKeyStore.openAI.storedKey() != nil { await openAIModels.load() }
             await chatGPT.loadIfNeeded()
             if chatGPT.isConnected && chatGPT.models.isEmpty { await chatGPT.loadModels() }
         }
@@ -187,6 +191,44 @@ struct SettingsView: View {
         }
         if let error = chatGPT.lastError {
             Text(error).font(.caption).foregroundStyle(.red)
+        }
+    }
+
+    /// Models this key can use (from OpenAI), with a refresh.
+    @ViewBuilder
+    private var openAIModelSection: some View {
+        Picker("Model", selection: $openAIModel) {
+            Text("Default (\(AIClient.defaultOpenAIModel))").tag("")
+            ForEach(openAIModels.models) { Text($0.id).tag($0.id) }
+            if !openAIModel.isEmpty && !openAIModels.models.contains(where: { $0.id == openAIModel }) {
+                Text(openAIModel).tag(openAIModel)
+            }
+        }
+        .pointingHandOnHover()
+        let levels = openAIModels.levels(for: openAIModel.isEmpty ? AIClient.defaultOpenAIModel : openAIModel)
+        Picker("Reasoning", selection: $openAIEffort) {
+            if levels.isEmpty {
+                ForEach(AISettings.efforts(for: .openAI), id: \.value) { Text($0.title).tag($0.value) }
+            } else {
+                Text("Automatic").tag("")
+                ForEach(levels, id: \.self) { Text(AISettings.title(forEffort: $0)).tag($0) }
+            }
+        }
+        .pointingHandOnHover()
+        HStack(spacing: 8) {
+            Button("Refresh Models") { Task { await openAIModels.load() } }
+                .pointingHandOnHover()
+                .disabled(openAIModels.loading || APIKeyStore.openAI.key == nil)
+            if openAIModels.loading { ProgressView().controlSize(.small) }
+            Spacer()
+            if !openAIModels.models.isEmpty {
+                Text("\(openAIModels.models.count) models").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        if let error = openAIModels.lastError {
+            Text(error).font(.caption).foregroundStyle(.red)
+        } else {
+            caption("Used for alternatives, ?? and the Lab. Lower reasoning is faster; if a model doesn't support a level, MyWriter uses the nearest one it does.")
         }
     }
 

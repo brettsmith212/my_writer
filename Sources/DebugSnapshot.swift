@@ -182,6 +182,22 @@ enum DebugSnapshot {
                 if let h = FileHandle(forWritingAtPath: parts[1]) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             case "hideshortcuts": session.showShortcuts = false
             case "quit": NSApp.terminate(nil)
+            case "parseopenai":
+                // parseopenai <in.json> <out>: run the model filter on a saved /v1/models response.
+                if let data = FileManager.default.contents(atPath: parts[1]),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let ids = OpenAIModels.parse(json).map(\.id).joined(separator: "\n")
+                    try? (ids + "\n").write(toFile: parts[safe: 2] ?? "/dev/null", atomically: true, encoding: .utf8)
+                }
+            case "openaimodels":
+                // openaimodels <path>: load the OpenAI key's models and write the parsed list.
+                let path = parts[1]
+                Task {
+                    await OpenAIModels.shared.load()
+                    let m = OpenAIModels.shared
+                    let out = "error: \(m.lastError ?? "none")\ncount: \(m.models.count)\n" + m.models.map { "\($0.id)  levels=\($0.levels)" }.joined(separator: "\n") + "\n"
+                    try? out.write(toFile: path, atomically: true, encoding: .utf8)
+                }
             case "topchar":
                 // topchar <path> <label>: append the character at the top of the page and the scroll offset.
                 if let tv = session.textView {
