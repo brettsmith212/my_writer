@@ -62,7 +62,7 @@ dmg="dist/MyWriter-$version.dmg"
 [[ -f "$dmg" ]] || { echo "Expected $dmg after make dmg." >&2; exit 1; }
 
 # 3. Publish.
-git push -q
+git push -q origin HEAD
 git tag -a "$tag" -m "MyWriter $version"
 git push -q origin "$tag"
 gh release create "$tag" "$dmg" --title "MyWriter $version" --generate-notes \
@@ -83,7 +83,7 @@ url="https://github.com/brettsmith212/my_writer/releases/download/$tag/MyWriter-
 Tools/appcast.py "$version" "$build" "$url" "$length" "$signature" "$notes"
 rm -f "$notes"
 git commit -qm "Appcast: MyWriter $version" appcast.xml
-git push -q
+git push -q origin HEAD
 
 # 5. Install the official copy.
 pkill -x MyWriter 2>/dev/null && sleep 1 || true
