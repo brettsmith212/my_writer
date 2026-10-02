@@ -11,7 +11,7 @@ enum AppShortcut: CaseIterable {
     case ghost, stash, overflowPanel, labPanel, preview, zen, copyClean, shortcutsCard
 
     enum Style: String, CaseIterable, Identifiable {
-        case control, command
+        case command, control  // the default first
         var id: String { rawValue }
         var title: String { self == .control ? "Control (⌃⇧)" : "Command (⌘)" }
     }

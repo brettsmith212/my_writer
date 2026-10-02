@@ -301,7 +301,6 @@ final class EditorTextView: NSTextView {
         let selection = selectedRange()
         guard featuresOn, selection.length > 0, !isDraggingSelection,
               window?.isKeyWindow == true, let session, session.tourStep == nil, !session.previewing,
-              vim.mode != .visual, vim.mode != .visualLine,
               let lm = layoutManager, let tc = textContainer, NSMaxRange(selection) <= (textStorage?.length ?? 0) else {
             if selectionBar.superview != nil { selectionBar.isHidden = true }
             return
@@ -336,6 +335,11 @@ final class EditorTextView: NSTextView {
             session.toggleGhost(range: selection)
             setSelectedRange(NSRange(location: NSMaxRange(selection), length: 0))
         case .stash: session.stash(range: selection)
+        }
+        // From Vim's Visual modes, an action ends the selection like d or y
+        // would, which returns Vim to Normal mode.
+        if (vim.mode == .visual || vim.mode == .visualLine), selectedRange().length > 0 {
+            setSelectedRange(NSRange(location: min(selection.location, (string as NSString).length), length: 0))
         }
         window?.makeFirstResponder(self)
     }
