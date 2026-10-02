@@ -98,11 +98,14 @@ struct UpdatesSection: View {
         Section("Updates") {
             Toggle("Check for updates automatically", isOn: $autoCheck)
                 .onChange(of: autoCheck) { _, on in Updates.shared.updater.automaticallyChecksForUpdates = on }
+                .pointingHandOnHover()
             Toggle("Download and install updates automatically", isOn: $autoInstall)
                 .onChange(of: autoInstall) { _, on in Updates.shared.updater.automaticallyDownloadsUpdates = on }
+                .pointingHandOnHover()
                 .disabled(!autoCheck)
             LabeledContent {
                 Button("Check Now") { Updates.shared.checkForUpdates() }
+                .pointingHandOnHover()
             } label: {
                 Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
             }

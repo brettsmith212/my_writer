@@ -316,11 +316,12 @@ struct ContentView: View {
                 Image(systemName: "exclamationmark.circle").foregroundStyle(Color.accent)
                 Text(message).font(.system(size: 12)).foregroundStyle(Color.ink)
                 SettingsLink { Text("Settings").font(.system(size: 12, weight: .medium)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accent)
+                    .buttonStyle(ToastButtonStyle(tint: Color.accent))
+                    .pointingHandOnHover()
                 Button { session.errorMessage = nil } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.inkSecondary)
+                    .buttonStyle(ToastButtonStyle(tint: Color.inkSecondary))
+                    .pointingHandOnHover()
+                    .help("Dismiss")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -329,6 +330,34 @@ struct ContentView: View {
             .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
             .padding(.bottom, 64)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+
+/// A small text or icon button in a toast: a soft highlight on hover, a
+/// little darker when pressed.
+private struct ToastButtonStyle: ButtonStyle {
+    let tint: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverHighlight(tint: tint, pressed: configuration.isPressed) { configuration.label }
+    }
+
+    private struct HoverHighlight<Label: View>: View {
+        let tint: Color
+        let pressed: Bool
+        @ViewBuilder let label: () -> Label
+        @State private var hovering = false
+
+        var body: some View {
+            label()
+                .foregroundStyle(tint)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(tint.opacity(pressed ? 0.22 : hovering ? 0.12 : 0)))
+                .contentShape(Capsule())
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
         }
     }
 }

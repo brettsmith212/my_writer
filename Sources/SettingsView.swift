@@ -27,6 +27,7 @@ struct SettingsView: View {
                 Picker("Connect with", selection: $provider) {
                     ForEach(AIProvider.allCases) { Text($0.title).tag($0.rawValue) }
                 }
+                .pointingHandOnHover()
 
                 switch AIProvider(rawValue: provider) ?? .chatGPT {
                 case .anthropic:
@@ -37,6 +38,7 @@ struct SettingsView: View {
                         Text("Default (Claude Sonnet 5.5)").tag("")
                         ForEach(AIClient.anthropicModels, id: \.id) { Text($0.name).tag($0.id) }
                     }
+                .pointingHandOnHover()
                     reasoningPicker(.anthropic, $anthropicEffort)
                 case .openAI:
                     SecureField("API key", text: $openAIKey, prompt: Text("sk-…"))
@@ -54,7 +56,9 @@ struct SettingsView: View {
             tab {
                 Section("Writing") {
                 Toggle("Hide Markdown symbols outside the line you're editing", isOn: $hideMarkdown)
+                .pointingHandOnHover()
                 Toggle("Play sounds when cycling alternatives", isOn: $soundsEnabled)
+                .pointingHandOnHover()
                 }
                 ShellCommandSection()
                 UpdatesSection()
@@ -66,16 +70,19 @@ struct SettingsView: View {
                 Picker("Modifier keys", selection: $shortcutStyle) {
                     ForEach(AppShortcut.Style.allCases) { Text($0.title).tag($0.rawValue) }
                 }
+                .pointingHandOnHover()
                 caption(shortcutStyle == AppShortcut.Style.control.rawValue
                     ? "MyWriter's shortcuts use Control + Shift + a letter (⌃⇧A alternatives, ⌃⇧G ghost…), leaving plain Control keys for Vim and text editing. Standard Mac shortcuts like ⌘S stay the same."
                     : "MyWriter's shortcuts use Command, Mac style (⇧⌘A alternatives, ⌥⌘G ghost…).")
                 }
                 Section("Vim") {
                 Toggle("Vim mode", isOn: $vimEnabled)
+                .pointingHandOnHover()
                 if vimEnabled {
                     Toggle("Line motions follow wrapped lines", isOn: $vimScreenLines)
+                .pointingHandOnHover()
                     caption(vimScreenLines
-                        ? "j k 0 ^ $ I A D C act on the line as you see it. dd cc yy o J still act on the whole paragraph."
+                        ? "j k 0 ^ $ I A D C dd cc yy V act on the line as you see it. o and J act on the whole paragraph."
                         : "Strict Vim: a line is a whole paragraph. Use gj gk g0 g^ g$ for wrapped lines.")
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Key mappings")
@@ -132,11 +139,14 @@ struct SettingsView: View {
                     Text(chatgptModel).tag(chatgptModel)
                 }
             }
+            .pointingHandOnHover()
             chatGPTReasoningPicker
             HStack {
                 Button("Refresh Models") { Task { await chatGPT.loadModels() } }
+                .pointingHandOnHover()
                 Spacer()
                 Button("Disconnect", role: .destructive) { chatGPT.signOut() }
+                .pointingHandOnHover()
             }
             caption("Requests use your ChatGPT plan. Set usage limits for MyWriter in ChatGPT settings.")
         } else if chatGPT.signingIn {
@@ -145,6 +155,7 @@ struct SettingsView: View {
                 Text("Finish signing in in your browser…")
                 Spacer()
                 Button("Cancel") { chatGPT.cancelSignIn() }
+                .pointingHandOnHover()
             }
         } else {
             HStack {
@@ -160,6 +171,7 @@ struct SettingsView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.primary)
                 .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                .pointingHandOnHover()
                 Spacer()
             }
             caption("Opens your browser to sign in. MyWriter keeps the connection in your Keychain and never sees your password.")
@@ -184,6 +196,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .pointingHandOnHover()
         .onChange(of: chatgptModel) { _, _ in
             // A model that doesn't offer the chosen level falls back to its own default.
             let newModel = chatGPT.models.first { $0.slug == (chatgptModel.isEmpty ? chatGPT.defaultModel?.slug : chatgptModel) }
@@ -202,6 +215,7 @@ struct SettingsView: View {
         Picker("Reasoning", selection: selection) {
             ForEach(AISettings.efforts(for: provider), id: \.value) { Text($0.title).tag($0.value) }
         }
+        .pointingHandOnHover()
         caption("Used for alternatives, ?? and the Lab. Lower is faster; raise it if Lab results feel shallow.")
     }
 
@@ -213,6 +227,7 @@ struct SettingsView: View {
                 save()
                 status = "Saved"
             }
+            .pointingHandOnHover()
         }
     }
 
@@ -244,11 +259,13 @@ private struct ShellCommandSection: View {
                         ShellCommand.uninstall()
                         installed = ShellCommand.installed
                     }
+                    .pointingHandOnHover()
                 } else {
                     Button("Install") {
                         ShellCommand.installWithAlert()
                         installed = ShellCommand.installed
                     }
+                    .pointingHandOnHover()
                 }
             } label: {
                 Text("Open files from a terminal with `mywriter file.md`")

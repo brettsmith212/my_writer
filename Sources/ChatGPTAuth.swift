@@ -383,6 +383,7 @@ final class ChatGPTAuth: ObservableObject {
         onText: ((String) -> Void)? = nil
     ) async throws -> String {
         await loadIfNeeded()
+        guard isConnected else { throw AIError.notSetUp }
         if currentModel == nil {
             await loadModels()
         } else if models.isEmpty {

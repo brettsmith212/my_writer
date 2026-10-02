@@ -26,7 +26,8 @@ struct QuotedNote: Decodable {
 }
 
 enum AIProvider: String, CaseIterable, Identifiable {
-    case anthropic, openAI, chatGPT
+    // Listed in this order in Settings: the ChatGPT plan first.
+    case chatGPT, openAI, anthropic
 
     var id: String { rawValue }
 
