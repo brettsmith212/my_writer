@@ -292,6 +292,7 @@ private struct RecentRow: View {
         )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .pointingHandOnHover()
         .help("Double-click or press Return to open")
     }
 }

@@ -289,12 +289,14 @@ struct LabToolEditor: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
+                .pointingHandOnHover()
             Button("Save & Run") {
                 store.save(draft)
                 dismiss()
                 onRun(store.tools.first { $0.id == draft.id } ?? draft)
             }
             .disabled(promptIsEmpty)
+            .pointingHandOnHover()
             Button("Save") {
                 store.save(draft)
                 dismiss()
@@ -304,6 +306,7 @@ struct LabToolEditor: View {
             .tint(Color.accent)
             .disabled(promptIsEmpty)
             .help("Save (⌘↩)")
+            .pointingHandOnHover()
         }
         .controlSize(.large)
         .padding(.horizontal, 28)

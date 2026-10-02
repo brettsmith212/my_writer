@@ -102,9 +102,9 @@ struct LabPanel: View {
         }
         if !session.cuts.isEmpty {
             HStack(spacing: 12) {
-                Button("Cut all") { session.acceptAllCuts() }
-                Button("Ghost all") { session.ghostAllCuts() }
-                Button("Keep all") { session.clearLab() }
+                Button("Cut all") { session.acceptAllCuts() }.pointingHandOnHover()
+                Button("Ghost all") { session.ghostAllCuts() }.pointingHandOnHover()
+                Button("Keep all") { session.clearLab() }.pointingHandOnHover()
                 Spacer()
             }
             .buttonStyle(.plain)
@@ -118,7 +118,9 @@ struct LabPanel: View {
                         session.reveal(.proposedCut, id: cut.id)
                     } actions: {
                         Button { session.acceptCut(cut.id) } label: { Label("Cut", systemImage: "scissors") }
+                            .pointingHandOnHover()
                         Button { session.keepCut(cut.id) } label: { Label("Keep", systemImage: "arrow.uturn.backward") }
+                            .pointingHandOnHover()
                     }
                 }
             }
@@ -127,6 +129,7 @@ struct LabPanel: View {
             HStack {
                 Spacer()
                 Button("Clear") { session.clearLab() }
+                    .pointingHandOnHover()
                     .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.accent)
@@ -137,6 +140,7 @@ struct LabPanel: View {
                         session.reveal(.labMark, id: finding.id)
                     } actions: {
                         Button { session.dismissFinding(finding.id) } label: { Label("Dismiss", systemImage: "checkmark") }
+                            .pointingHandOnHover()
                     }
                 }
             }
@@ -230,6 +234,7 @@ private struct ResultCard<Actions: View>: View {
     let strike: Bool
     let onTap: () -> Void
     @ViewBuilder let actions: () -> Actions
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -250,8 +255,13 @@ private struct ResultCard<Actions: View>: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.paper))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.hairline))
+        .overlay(RoundedRectangle(cornerRadius: 8).fill(Color.ink.opacity(hovering ? 0.03 : 0)))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(hovering ? Color.accent.opacity(0.35) : Color.hairline))
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+        .onHover { hovering = $0 }
+        .pointingHandOnHover()
+        .help("Show in the text")
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

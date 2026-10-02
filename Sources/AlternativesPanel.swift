@@ -169,6 +169,7 @@ struct AlternativesPanel: View {
             }
             .disabled(session.aiLoadingGroup != nil)
             .help("Ask AI for more alternatives (or type ?? above)")
+            .pointingHandOnHover()
             Spacer()
             Menu {
                 Button("Clear AI Suggestions") { session.clearAISuggestions(groupID: group.id) }
@@ -180,6 +181,8 @@ struct AlternativesPanel: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .pointingHandOnHover()
+            .help("More")
         }
         .buttonStyle(.plain)
         .font(.system(size: 12))
@@ -262,9 +265,9 @@ private struct OptionRow: View {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.inkSecondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(IconButtonStyle(size: 18))
+                .pointingHandOnHover()
                 .help("Delete (or select and press Delete)")
             }
         }
@@ -277,6 +280,8 @@ private struct OptionRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onHover { hovering = $0 }
+        .pointingHandOnHover()
+        .help(isSelected ? "In use" : "Click to use this version")
     }
 }
 
@@ -375,6 +380,33 @@ struct Keycap: View {
     }
 }
 
+/// A small icon button: secondary ink, with a soft round highlight on hover
+/// that deepens while pressed.
+struct IconButtonStyle: ButtonStyle {
+    var size: CGFloat = 22
+
+    func makeBody(configuration: Configuration) -> some View {
+        Body(size: size, pressed: configuration.isPressed) { configuration.label }
+    }
+
+    private struct Body<Label: View>: View {
+        let size: CGFloat
+        let pressed: Bool
+        @ViewBuilder let label: () -> Label
+        @State private var hovering = false
+
+        var body: some View {
+            label()
+                .foregroundStyle(hovering ? Color.ink : Color.inkSecondary)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color.ink.opacity(pressed ? 0.14 : hovering ? 0.07 : 0)))
+                .contentShape(Circle())
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+    }
+}
+
 struct PanelHeader: View {
     let title: String
     let close: () -> Void
@@ -389,11 +421,10 @@ struct PanelHeader: View {
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundStyle(Color.inkSecondary)
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(IconButtonStyle(size: 22))
+            .pointingHandOnHover()
+            .help("Close")
         }
         .padding(.horizontal, 18)
         .padding(.top, 40)

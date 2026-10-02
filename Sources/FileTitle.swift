@@ -103,9 +103,11 @@ struct FileDetails: View {
             HStack(spacing: 14) {
                 if renaming {
                     Button("Cancel") { renaming = false; error = nil }
+                        .pointingHandOnHover()
                     Spacer()
                     Button("Rename", action: rename)
                         .keyboardShortcut(.defaultAction)
+                        .pointingHandOnHover()
                 } else {
                     action("Show in Finder", "magnifyingglass") {
                         NSWorkspace.shared.activateFileViewerSelecting([fileURL])

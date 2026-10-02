@@ -38,6 +38,7 @@ struct AISetupSheet: View {
             .tint(Color.accent)
             .controlSize(.large)
             .disabled(chatGPT.signingIn)
+            .pointingHandOnHover()
 
             if let error = chatGPT.lastError {
                 Text(error)
@@ -52,6 +53,7 @@ struct AISetupSheet: View {
                 SettingsLink { Text("Use it in Settings") }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accent)
+                    .pointingHandOnHover()
                     .simultaneousGesture(TapGesture().onEnded { dismiss() })
             }
             .font(.system(size: 11.5))
@@ -64,6 +66,7 @@ struct AISetupSheet: View {
             .font(.system(size: 12))
             .foregroundStyle(Color.inkSecondary)
             .keyboardShortcut(.cancelAction)
+            .pointingHandOnHover()
         }
         .padding(28)
         .frame(width: 380)
