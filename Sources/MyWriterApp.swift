@@ -64,6 +64,15 @@ struct WriterCommands: Commands {
                 .keyboardShortcut("t", modifiers: .command)
         }
 
+        CommandGroup(replacing: .appInfo) {
+            // The standard About, showing "Version 0.2.4" without the build
+            // number (which only Sparkle needs).
+            Button("About MyWriter") {
+                let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+                NSApp.orderFrontStandardAboutPanel(options: [.applicationVersion: version, .version: ""])
+            }
+        }
+
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") { Updates.shared.checkForUpdates() }
         }
