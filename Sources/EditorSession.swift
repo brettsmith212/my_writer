@@ -26,14 +26,18 @@ final class EditorSession: NSObject, ObservableObject {
     weak var overflowView: NSTextView?
     weak var undoManager: UndoManager?
 
-    @Published var featuresOn: Bool = UserDefaults.standard.bool(forKey: "featuresOn") {
+    /// The writing tools. Every document opens with them on; hiding them is a
+    /// choice for this window only, so it isn't remembered.
+    @Published var featuresOn: Bool = true {
         didSet {
             guard oldValue != featuresOn else { return }
-            UserDefaults.standard.set(featuresOn, forKey: "featuresOn")
             textView?.featuresOn = featuresOn
             restyleAll()
         }
     }
+    /// True while typing with the tools hidden: their button fades away
+    /// until the pointer moves.
+    @Published var typingQuietly = false
     @Published var showAlternatives = false {
         didSet { if showAlternatives { AIClient.prewarm() } }
     }
@@ -734,6 +738,7 @@ extension EditorSession: NSTextViewDelegate {
         syncGroups()
         updateWordCount()
         textView?.needsDisplay = true
+        if !featuresOn, !typingQuietly { typingQuietly = true }
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {

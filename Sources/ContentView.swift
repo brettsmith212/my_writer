@@ -10,6 +10,7 @@ struct ContentView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var showZenHint = false
     @State private var showFileTitle = false
+    @State private var toolsHovered = false
     @ObservedObject private var tabs = TabsModel.shared
     @ObservedObject private var zoom = Zoom.shared
     @State private var showZoomHint = false
@@ -62,12 +63,14 @@ struct ContentView: View {
             .overlay(alignment: .top) { topBar }
             .overlay(alignment: .top) { zenHint }
             .overlay(alignment: .top) { zoomHint }
-            .overlay(alignment: .bottomTrailing) { if session.featuresOn { toolBar } }
             .overlay(alignment: .bottom) { errorToast }
             // The page changes width in one step when a panel opens or closes,
             // so the text re-wraps once (no flicker) and keeps its place.
             .transaction { $0.animation = nil }
+            // After the line above, so the tools can animate open and closed.
+            .overlay(alignment: .bottomTrailing) { toolBar }
             .onContinuousHover { phase in
+                if session.typingQuietly { session.typingQuietly = false }
                 // Reveal the file name while the pointer is in the top strip. Applied
                 // after the overlays so being over the name itself still counts.
                 let near: Bool
@@ -276,8 +279,39 @@ struct ContentView: View {
         .padding(.top, 8)
     }
 
+    /// The writing tools, in the bottom-right corner. The last button opens
+    /// and closes them; with the tools hidden it's all that shows, faint, and
+    /// it fades away while you type until the pointer moves.
     private var toolBar: some View {
         HStack(spacing: 4) {
+            if session.featuresOn {
+                tools
+                Rectangle().fill(Color.hairline).frame(width: 1, height: 16)
+                    .transition(.opacity)
+            }
+            ToolButton(
+                icon: session.featuresOn ? "chevron.right" : "pencil",
+                active: false,
+                help: session.featuresOn ? "Hide writing tools · \(AppShortcut.toggleTools.label)" : "Show writing tools · \(AppShortcut.toggleTools.label)"
+            ) {
+                session.featuresOn.toggle()
+            }
+            .tourAnchor(.toolsToggle)
+        }
+        .padding(4)
+        .background(Capsule().fill(Color.panel.opacity(0.92)))
+        .overlay(Capsule().strokeBorder(Color.hairline))
+        .onHover { toolsHovered = $0 }
+        .opacity(session.featuresOn || toolsHovered ? 1 : session.typingQuietly ? 0 : 0.55)
+        .allowsHitTesting(session.featuresOn || !session.typingQuietly)
+        .padding(14)
+        .animation(.easeOut(duration: 0.22), value: session.featuresOn)
+        .animation(.easeOut(duration: 0.3), value: session.typingQuietly)
+        .animation(.easeOut(duration: 0.15), value: toolsHovered)
+    }
+
+    @ViewBuilder
+    private var tools: some View {
             ToolButton(icon: "text.badge.plus", active: session.showAlternatives, help: "Alternatives · \(AppShortcut.alternatives.label)") {
                 session.showAlternatives.toggle()
             }
@@ -294,12 +328,6 @@ struct ContentView: View {
                 session.previewing.toggle()
             }
             .tourAnchor(.previewButton)
-        }
-        .padding(4)
-        .background(Capsule().fill(Color.panel.opacity(0.92)))
-        .overlay(Capsule().strokeBorder(Color.hairline))
-        .padding(14)
-        .transition(.opacity)
     }
 
     @ViewBuilder

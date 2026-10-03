@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Places in the window the tour can point at.
 enum TourAnchor: Hashable {
-    case wordCount, alternativesButton, overflowButton, labButton, previewButton
+    case wordCount, toolsToggle, alternativesButton, overflowButton, labButton, previewButton
 }
 
 struct TourAnchorKey: PreferenceKey {
@@ -37,9 +37,10 @@ struct TourStep {
             body: "A quiet page for writing. Everything else stays out of the way until you ask for it."
         ),
         TourStep(
-            anchor: .wordCount,
+            anchor: .toolsToggle,
             title: "Your tools live here",
-            body: "Click the word count to bring in the writing tools. Click it again to put them away. (\(AppShortcut.toggleTools.label))"
+            body: "The writing tools sit in this corner. Click › to tuck them away for plain writing, and the pencil to bring them back. (\(AppShortcut.toggleTools.label), or click the word count)",
+            needsTools: true
         ),
         TourStep(
             anchor: nil,
@@ -209,7 +210,7 @@ struct ShortcutsSheet: View {
 
     private var groups: [(String, [(String, String)])] { [
         ("Writing tools", [
-            ("Show or hide tools", "\(AppShortcut.toggleTools.label)  or click the word count"),
+            ("Show or hide tools", "\(AppShortcut.toggleTools.label)  or the button at the end of the tools"),
             ("Preview Markdown", AppShortcut.preview.label),
             ("Copy clean text", AppShortcut.copyClean.label),
             ("Export clean copy", "⌥⇧⌘E"),
