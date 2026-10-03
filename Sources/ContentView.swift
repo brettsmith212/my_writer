@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var showZenHint = false
     @State private var showFileTitle = false
     @State private var toolsHovered = false
+    @State private var wordCountHovered = false
     @ObservedObject private var tabs = TabsModel.shared
     @ObservedObject private var zoom = Zoom.shared
     @State private var showZoomHint = false
@@ -262,13 +263,19 @@ struct ContentView: View {
                 } label: {
                     Text("\(session.wordCount) \(session.wordCount == 1 ? "word" : "words")")
                         .font(.system(size: 11.5, weight: .medium).monospacedDigit())
-                        .foregroundStyle(session.featuresOn ? Color.accent : Color.inkSecondary)
+                        .foregroundStyle(session.featuresOn ? Color.accent : wordCountHovered ? Color.ink : Color.inkSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Capsule().fill(session.featuresOn ? Color.accent.opacity(0.1) : .clear))
+                        // A soft fill on hover shows it's a button.
+                        .background(Capsule().fill(
+                            session.featuresOn ? Color.accent.opacity(wordCountHovered ? 0.17 : 0.1)
+                                : Color.ink.opacity(wordCountHovered ? 0.07 : 0)
+                        ))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .onHover { wordCountHovered = $0 }
+                .animation(.easeOut(duration: 0.12), value: wordCountHovered)
                 .pointingHandOnHover()
                 .tourAnchor(.wordCount)
                 .help(session.featuresOn ? "Hide writing tools (\(AppShortcut.toggleTools.label))" : "Show writing tools (\(AppShortcut.toggleTools.label))")
@@ -312,22 +319,22 @@ struct ContentView: View {
 
     @ViewBuilder
     private var tools: some View {
-            ToolButton(icon: "text.badge.plus", active: session.showAlternatives, help: "Alternatives · \(AppShortcut.alternatives.label)") {
-                session.showAlternatives.toggle()
-            }
-            .tourAnchor(.alternativesButton)
-            ToolButton(icon: "tray", active: session.rightPanel == .overflow, help: "Overflow drawer · \(AppShortcut.overflowPanel.label)") {
-                session.rightPanel = session.rightPanel == .overflow ? nil : .overflow
-            }
-            .tourAnchor(.overflowButton)
-            ToolButton(icon: "flask", active: session.rightPanel == .lab, help: "Lab: AI editing · \(AppShortcut.labPanel.label)") {
-                session.rightPanel = session.rightPanel == .lab ? nil : .lab
-            }
-            .tourAnchor(.labButton)
-            ToolButton(icon: "eye", active: session.previewing, help: "Preview · \(AppShortcut.preview.label)") {
-                session.previewing.toggle()
-            }
-            .tourAnchor(.previewButton)
+        ToolButton(icon: "text.badge.plus", active: session.showAlternatives, help: "Alternatives · \(AppShortcut.alternatives.label)") {
+            session.showAlternatives.toggle()
+        }
+        .tourAnchor(.alternativesButton)
+        ToolButton(icon: "tray", active: session.rightPanel == .overflow, help: "Overflow drawer · \(AppShortcut.overflowPanel.label)") {
+            session.rightPanel = session.rightPanel == .overflow ? nil : .overflow
+        }
+        .tourAnchor(.overflowButton)
+        ToolButton(icon: "flask", active: session.rightPanel == .lab, help: "Lab: AI editing · \(AppShortcut.labPanel.label)") {
+            session.rightPanel = session.rightPanel == .lab ? nil : .lab
+        }
+        .tourAnchor(.labButton)
+        ToolButton(icon: "eye", active: session.previewing, help: "Preview · \(AppShortcut.preview.label)") {
+            session.previewing.toggle()
+        }
+        .tourAnchor(.previewButton)
     }
 
     @ViewBuilder
