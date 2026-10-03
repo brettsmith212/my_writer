@@ -6,6 +6,15 @@
     <description>Updates for MyWriter. Written by `make release`; don't edit by hand.</description>
     <language>en</language>
     <item>
+      <title>MyWriter 0.2.4</title>
+      <pubDate>Sat, 03 Oct 2026 02:49:04 GMT</pubDate>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>Word count shows a soft hover fill so it reads as clickable</li><li>Writing tools: on for every document, with a show/hide button at the end of the tools</li><li>Settings → Editor → Appearance: System, Light or Dark</li><li>Continue with ChatGPT button uses the page&#x27;s ink and paper instead of pure black</li><li>Appcast: MyWriter 0.2.3</li></ul>]]></description>
+      <enclosure url="https://github.com/brettsmith212/my_writer/releases/download/v0.2.4/MyWriter-0.2.4.dmg" length="5849646" type="application/octet-stream" sparkle:edSignature="3akD+KT6wQwqqCTX5pvD7FaSRmNtxeOX0XO0lA7Zy+w422P2q/u0gQZqE7d7Urs3o4oDKHFO11q5Kn2vhF6mDA=="/>
+    </item>
+    <item>
       <title>MyWriter 0.2.3</title>
       <pubDate>Fri, 02 Oct 2026 23:40:34 GMT</pubDate>
       <sparkle:version>5</sparkle:version>
